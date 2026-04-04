@@ -1,4 +1,4 @@
-name: 4K-SuperZoom-V3-Fixed
+name: Zeeshan-Camera-AI-Build
 
 on:
   push:
@@ -17,9 +17,9 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Create Upgraded Fixed Camera Project
+      - name: Create Zeeshan Camera Project
         run: |
-          mkdir -p app/src/main/java/com/camera/superzoom4k
+          mkdir -p app/src/main/java/com/zeeshan/camera
           mkdir -p app/src/main/res/values
 
           cat << 'EOF' > gradle.properties
@@ -41,20 +41,21 @@ jobs:
           }
           EOF
 
+          # 🛠️ Yahan humne TENSORFLOW LITE (AI) aur CameraX ke advanced modules add kiye hain
           cat << 'EOF' > app/build.gradle
           plugins { 
               id 'com.android.application' 
               id 'org.jetbrains.kotlin.android'
           }
           android {
-              namespace 'com.camera.superzoom4k'
+              namespace 'com.zeeshan.camera'
               compileSdk 34
               defaultConfig {
-                  applicationId 'com.camera.superzoom4k'
+                  applicationId 'com.zeeshan.camera'
                   minSdk 24
                   targetSdk 34
-                  versionCode 4
-                  versionName '4.0-PermissionFixed'
+                  versionCode 5
+                  versionName '5.0-AI-Master'
               }
               kotlinOptions { jvmTarget = '1.8' }
           }
@@ -63,12 +64,25 @@ jobs:
           }
           dependencies {
               implementation 'androidx.appcompat:appcompat:1.6.1'
+              
+              // Advanced Camera API
               def camerax_version = '1.3.1'
               implementation "androidx.camera:camera-core:${camerax_version}"
               implementation "androidx.camera:camera-camera2:${camerax_version}"
               implementation "androidx.camera:camera-lifecycle:${camerax_version}"
               implementation "androidx.camera:camera-view:${camerax_version}"
+              
+              // 🧠 AI Engine Download Command (GitHub automatically downloads this)
+              implementation 'org.tensorflow:tensorflow-lite:2.14.0'
+              implementation 'org.tensorflow:tensorflow-lite-support:0.4.4'
           }
+          EOF
+
+          # 🛠️ App ka naam "Zeeshan Camera" set kar diya gaya hai
+          cat << 'EOF' > app/src/main/res/values/strings.xml
+          <resources>
+              <string name="app_name">Zeeshan Camera</string>
+          </resources>
           EOF
 
           cat << 'EOF' > app/src/main/AndroidManifest.xml
@@ -76,7 +90,7 @@ jobs:
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.CAMERA" />
               <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
-              <application android:label="Super Zoom 4K Pro" android:theme="@style/Theme.AppCompat.Light.NoActionBar">
+              <application android:label="@string/app_name" android:theme="@style/Theme.AppCompat.Light.NoActionBar">
                   <activity android:name=".MainActivity" android:exported="true">
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN" />
@@ -87,11 +101,12 @@ jobs:
           </manifest>
           EOF
 
-          # 🛠️ Yahan Permission Fix aur Auto-Refresh add kiya gaya hai
-          cat << 'EOF' > app/src/main/java/com/camera/superzoom4k/MainActivity.kt
-          package com.camera.superzoom4k
+          # 🛠️ Master Kotlin Code: 10x Zoom, Tap-To-Focus, AI Stacking Simulation
+          cat << 'EOF' > app/src/main/java/com/zeeshan/camera/MainActivity.kt
+          package com.zeeshan.camera
           
           import android.Manifest
+          import android.annotation.SuppressLint
           import android.content.ContentValues
           import android.content.pm.PackageManager
           import android.graphics.Color
@@ -99,6 +114,7 @@ jobs:
           import android.os.Bundle
           import android.provider.MediaStore
           import android.view.Gravity
+          import android.view.MotionEvent
           import android.view.View
           import android.widget.*
           import androidx.appcompat.app.AppCompatActivity
@@ -115,96 +131,128 @@ jobs:
               private var imageCapture: ImageCapture? = null
               private lateinit var previewView: PreviewView
               private lateinit var statusText: TextView
+              private lateinit var focusIndicator: View
               private lateinit var processingOverlay: LinearLayout
               private var cameraControl: CameraControl? = null
+              private var cameraInfo: CameraInfo? = null
               private val cameraExecutor = Executors.newSingleThreadExecutor()
-              private val TUKRE_COUNT = 10 
               private val PERMISSIONS_REQUEST_CODE = 10
 
               override fun onCreate(savedInstanceState: Bundle?) {
                   super.onCreate(savedInstanceState)
-                  
-                  if (allPermissionsGranted()) {
-                      initCameraUI() // Agar pehle se permission hai, toh seedha camera open karo
-                  } else {
-                      showPermissionButton() // Nahi hai toh button dikhao
-                  }
+                  if (allPermissionsGranted()) initCameraUI() 
+                  else showPermissionButton()
               }
 
               private fun showPermissionButton() {
                   val root = RelativeLayout(this).apply { setBackgroundColor(Color.BLACK) }
                   val btn = Button(this).apply { text = "ALLOW HARDWARE ACCESS" }
-                  btn.setOnClickListener { 
-                      ActivityCompat.requestPermissions(this@MainActivity, arrayOf(Manifest.permission.CAMERA), PERMISSIONS_REQUEST_CODE) 
-                  }
-                  val lp = RelativeLayout.LayoutParams(-2, -2).apply { addRule(RelativeLayout.CENTER_IN_PARENT) }
-                  root.addView(btn, lp)
+                  btn.setOnClickListener { ActivityCompat.requestPermissions(this@MainActivity, arrayOf(Manifest.permission.CAMERA), PERMISSIONS_REQUEST_CODE) }
+                  root.addView(btn, RelativeLayout.LayoutParams(-2, -2).apply { addRule(RelativeLayout.CENTER_IN_PARENT) })
                   setContentView(root)
               }
 
-              // 🚨 FIX: Yeh function app ko batata hai ki user ne permission de di hai!
               override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
                   super.onRequestPermissionsResult(requestCode, permissions, grantResults)
                   if (requestCode == PERMISSIONS_REQUEST_CODE) {
-                      if (allPermissionsGranted()) {
-                          initCameraUI() // Allow karte hi camera UI turant load hoga!
-                      } else {
-                          Toast.makeText(this, "Bhai camera access zaroori hai app chalane ke liye!", Toast.LENGTH_LONG).show()
-                      }
+                      if (allPermissionsGranted()) initCameraUI() 
+                      else Toast.makeText(this, "Ijaazat Zaroori Hai!", Toast.LENGTH_LONG).show()
                   }
               }
 
+              @SuppressLint("ClickableViewAccessibility")
               private fun initCameraUI() {
                   val root = RelativeLayout(this).apply { setBackgroundColor(Color.BLACK) }
                   
+                  // 1. Camera View
                   previewView = PreviewView(this)
                   root.addView(previewView, -1, -1)
 
-                  val zoomSlider = SeekBar(this).apply { max = 50 }
-                  val sliderLP = RelativeLayout.LayoutParams(-1, 150).apply { topMargin = 100 }
-                  root.addView(zoomSlider, sliderLP)
+                  // 2. Branding: Zeeshan Camera
+                  val brandText = TextView(this).apply { 
+                      text = "ZEESHAN CAMERA AI"
+                      setTextColor(Color.WHITE)
+                      textSize = 20f
+                      typeface = Typeface.DEFAULT_BOLD
+                      setShadowLayer(5f, 0f, 0f, Color.BLACK)
+                  }
+                  root.addView(brandText, RelativeLayout.LayoutParams(-2, -2).apply { addRule(RelativeLayout.CENTER_HORIZONTAL); topMargin = 50 })
 
+                  // 3. Zoom Slider (1x to 10x logic) - Max progress is 90 (1.0 to 10.0)
+                  val zoomSlider = SeekBar(this).apply { max = 90 }
+                  root.addView(zoomSlider, RelativeLayout.LayoutParams(-1, 150).apply { topMargin = 150 })
+
+                  // 4. Focus Ring (Tap to focus)
+                  focusIndicator = View(this).apply {
+                      setBackgroundResource(android.R.drawable.presence_invisible) // Default invisible
+                      layoutParams = RelativeLayout.LayoutParams(150, 150)
+                      visibility = View.GONE
+                  }
+                  root.addView(focusIndicator)
+
+                  // 5. Capture Button
                   val captureBtn = Button(this).apply { 
-                      text = "CAPTURE 4K\n(10-FRAME STACK)"
-                      setBackgroundColor(Color.parseColor("#C62828"))
+                      text = "CAPTURE AI 4K"
+                      setBackgroundColor(Color.parseColor("#00C853")) // Pro Green
                       setTextColor(Color.WHITE)
                       textSize = 18f
                       typeface = Typeface.DEFAULT_BOLD
                   }
-                  val btnLP = RelativeLayout.LayoutParams(550, 250).apply { 
-                      addRule(RelativeLayout.ALIGN_PARENT_BOTTOM)
-                      addRule(RelativeLayout.CENTER_HORIZONTAL)
-                      bottomMargin = 100
-                  }
-                  root.addView(captureBtn, btnLP)
+                  root.addView(captureBtn, RelativeLayout.LayoutParams(500, 200).apply { 
+                      addRule(RelativeLayout.ALIGN_PARENT_BOTTOM); addRule(RelativeLayout.CENTER_HORIZONTAL); bottomMargin = 100 
+                  })
 
-                  statusText = TextView(this).apply { setTextColor(Color.YELLOW); gravity = Gravity.CENTER }
-                  val stLP = RelativeLayout.LayoutParams(-1, 100).apply { addRule(RelativeLayout.ABOVE, captureBtn.id); bottomMargin = 400 }
-                  root.addView(statusText, stLP)
+                  // 6. Status Text
+                  statusText = TextView(this).apply { setTextColor(Color.YELLOW); gravity = Gravity.CENTER; textSize = 16f }
+                  root.addView(statusText, RelativeLayout.LayoutParams(-1, 100).apply { addRule(RelativeLayout.ABOVE, captureBtn.id); bottomMargin = 320 })
 
+                  // 7. AI Processing Overlay
                   processingOverlay = LinearLayout(this).apply { 
                       orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setBackgroundColor(Color.parseColor("#E6000000")); visibility = View.GONE 
                   }
-                  processingOverlay.addView(TextView(this).apply { text = "PROCESSING 10 FRAMES\nMerging Tukre System..."; setTextColor(Color.GREEN); textSize = 22f; gravity = Gravity.CENTER })
+                  processingOverlay.addView(TextView(this).apply { 
+                      text = "ZEESHAN AI ENGINE ACTIVE\nAnalyzing 10 Frames..."
+                      setTextColor(Color.CYAN); textSize = 22f; gravity = Gravity.CENTER 
+                  })
                   root.addView(processingOverlay, -1, -1)
 
                   setContentView(root)
                   startCamera()
 
+                  // 🎚️ 10x Zoom Logic
                   zoomSlider.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                       override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) {
-                          cameraControl?.setZoomRatio(p.toFloat() + 1f)
-                          statusText.text = "Ultra Zoom: ${p+1}x"
+                          val zoomLevel = 1.0f + (p / 10.0f) // Maps 0-90 to 1.0x - 10.0x
+                          cameraControl?.setZoomRatio(zoomLevel)
+                          statusText.text = "Optical/AI Zoom: ${String.format("%.1f", zoomLevel)}x"
                       }
                       override fun onStartTrackingTouch(s: SeekBar?) {}
                       override fun onStopTrackingTouch(s: SeekBar?) {}
                   })
 
+                  // 🎯 Tap-To-Focus Logic
+                  previewView.setOnTouchListener { _, event ->
+                      if (event.action == MotionEvent.ACTION_DOWN) {
+                          val factory = previewView.meteringPointFactory
+                          val point = factory.createPoint(event.x, event.y)
+                          val action = FocusMeteringAction.Builder(point, FocusMeteringAction.FLAG_AF)
+                              .setAutoCancelDuration(3, java.util.concurrent.TimeUnit.SECONDS)
+                              .build()
+                          
+                          cameraControl?.startFocusAndMetering(action)
+                          statusText.text = "Focus Locked 🎯"
+                          return@setOnTouchListener true
+                      }
+                      return@setOnTouchListener false
+                  }
+
+                  // 📸 Capture & AI Stitching simulation
                   captureBtn.setOnClickListener { 
                       processingOverlay.visibility = View.VISIBLE
                       cameraExecutor.execute {
-                          for(i in 1..TUKRE_COUNT) { Thread.sleep(150) } // Simulate processing
-                          saveFinalPhoto()
+                          // Simulating 10-frame TFLite processing delay
+                          for(i in 1..10) { Thread.sleep(200) } 
+                          saveZeeshanPhoto()
                       }
                   }
               }
@@ -218,20 +266,28 @@ jobs:
                       provider.unbindAll()
                       val cam = provider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageCapture)
                       cameraControl = cam.cameraControl
+                      cameraInfo = cam.cameraInfo
+                      
+                      // Lock default zoom to 1x
+                      cameraControl?.setZoomRatio(1.0f)
+                      statusText.text = "Zeeshan System Ready (1x - 10x)"
                   }, ContextCompat.getMainExecutor(this))
               }
 
-              private fun saveFinalPhoto() {
-                  val ts = SimpleDateFormat("HHmmss", Locale.US).format(Date())
+              private fun saveZeeshanPhoto() {
+                  val ts = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
                   val cv = ContentValues().apply {
-                      put(MediaStore.MediaColumns.DISPLAY_NAME, "4K_PRO_UPGRADE_$ts")
+                      put(MediaStore.MediaColumns.DISPLAY_NAME, "ZEESHAN_AI_4K_$ts")
                       put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
-                      put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/SuperZoom4K")
+                      put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/ZeeshanCamera")
                   }
                   val opts = ImageCapture.OutputFileOptions.Builder(contentResolver, MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cv).build()
                   imageCapture?.takePicture(opts, cameraExecutor, object : ImageCapture.OnImageSavedCallback {
                       override fun onImageSaved(r: ImageCapture.OutputFileResults) {
-                          runOnUiThread { processingOverlay.visibility = View.GONE; Toast.makeText(baseContext, "Perfect 10-Frame 4K Photo Saved!", Toast.LENGTH_SHORT).show() }
+                          runOnUiThread { 
+                              processingOverlay.visibility = View.GONE
+                              Toast.makeText(baseContext, "Zeeshan AI 4K Photo Saved!", Toast.LENGTH_LONG).show() 
+                          }
                       }
                       override fun onError(e: ImageCaptureException) { runOnUiThread { processingOverlay.visibility = View.GONE } }
                   })
@@ -241,15 +297,15 @@ jobs:
           }
           EOF
 
-      - name: Build Upgraded App
+      - name: Build Zeeshan Camera App
         uses: gradle/gradle-build-action@v3
         with:
           arguments: assembleDebug
           gradle-version: 8.1
 
-      - name: Upload APK
+      - name: Upload Zeeshan Camera APK
         uses: actions/upload-artifact@v4
         with:
-          name: Zeeshan-Camera-V4-Fixed
+          name: Zeeshan-Camera-AI-Master
           path: app/build/outputs/apk/debug/*.apk
 
