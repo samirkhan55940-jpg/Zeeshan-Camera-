@@ -1,4 +1,4 @@
-name: 4K-SuperZoom-V3-Upgrade
+name: 4K-SuperZoom-V3-Fixed
 
 on:
   push:
@@ -17,7 +17,7 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Create Upgraded 10-Frame Camera Project
+      - name: Create Upgraded Fixed Camera Project
         run: |
           mkdir -p app/src/main/java/com/camera/superzoom4k
           mkdir -p app/src/main/res/values
@@ -53,8 +53,8 @@ jobs:
                   applicationId 'com.camera.superzoom4k'
                   minSdk 24
                   targetSdk 34
-                  versionCode 3
-                  versionName '3.0-TukreSystemV3'
+                  versionCode 4
+                  versionName '4.0-PermissionFixed'
               }
               kotlinOptions { jvmTarget = '1.8' }
           }
@@ -87,6 +87,7 @@ jobs:
           </manifest>
           EOF
 
+          # 🛠️ Yahan Permission Fix aur Auto-Refresh add kiya gaya hai
           cat << 'EOF' > app/src/main/java/com/camera/superzoom4k/MainActivity.kt
           package com.camera.superzoom4k
           
@@ -117,28 +118,45 @@ jobs:
               private lateinit var processingOverlay: LinearLayout
               private var cameraControl: CameraControl? = null
               private val cameraExecutor = Executors.newSingleThreadExecutor()
-              private val TUKRE_COUNT = 10 // Upgrade: 10 Photos system
+              private val TUKRE_COUNT = 10 
+              private val PERMISSIONS_REQUEST_CODE = 10
 
               override fun onCreate(savedInstanceState: Bundle?) {
                   super.onCreate(savedInstanceState)
-                  setupInitialUI()
-              }
-
-              private fun setupInitialUI() {
-                  val root = RelativeLayout(this).apply { setBackgroundColor(Color.BLACK) }
                   
                   if (allPermissionsGranted()) {
-                      showCameraUI(root)
+                      initCameraUI() // Agar pehle se permission hai, toh seedha camera open karo
                   } else {
-                      val btn = Button(this).apply { text = "Allow Hardware Access" }
-                      btn.setOnClickListener { ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), 10) }
-                      val lp = RelativeLayout.LayoutParams(-2, -2).apply { addRule(RelativeLayout.CENTER_IN_PARENT) }
-                      root.addView(btn, lp)
-                      setContentView(root)
+                      showPermissionButton() // Nahi hai toh button dikhao
                   }
               }
 
-              private fun showCameraUI(root: RelativeLayout) {
+              private fun showPermissionButton() {
+                  val root = RelativeLayout(this).apply { setBackgroundColor(Color.BLACK) }
+                  val btn = Button(this).apply { text = "ALLOW HARDWARE ACCESS" }
+                  btn.setOnClickListener { 
+                      ActivityCompat.requestPermissions(this@MainActivity, arrayOf(Manifest.permission.CAMERA), PERMISSIONS_REQUEST_CODE) 
+                  }
+                  val lp = RelativeLayout.LayoutParams(-2, -2).apply { addRule(RelativeLayout.CENTER_IN_PARENT) }
+                  root.addView(btn, lp)
+                  setContentView(root)
+              }
+
+              // 🚨 FIX: Yeh function app ko batata hai ki user ne permission de di hai!
+              override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
+                  super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+                  if (requestCode == PERMISSIONS_REQUEST_CODE) {
+                      if (allPermissionsGranted()) {
+                          initCameraUI() // Allow karte hi camera UI turant load hoga!
+                      } else {
+                          Toast.makeText(this, "Bhai camera access zaroori hai app chalane ke liye!", Toast.LENGTH_LONG).show()
+                      }
+                  }
+              }
+
+              private fun initCameraUI() {
+                  val root = RelativeLayout(this).apply { setBackgroundColor(Color.BLACK) }
+                  
                   previewView = PreviewView(this)
                   root.addView(previewView, -1, -1)
 
@@ -150,8 +168,10 @@ jobs:
                       text = "CAPTURE 4K\n(10-FRAME STACK)"
                       setBackgroundColor(Color.parseColor("#C62828"))
                       setTextColor(Color.WHITE)
+                      textSize = 18f
+                      typeface = Typeface.DEFAULT_BOLD
                   }
-                  val btnLP = RelativeLayout.LayoutParams(500, 250).apply { 
+                  val btnLP = RelativeLayout.LayoutParams(550, 250).apply { 
                       addRule(RelativeLayout.ALIGN_PARENT_BOTTOM)
                       addRule(RelativeLayout.CENTER_HORIZONTAL)
                       bottomMargin = 100
@@ -163,9 +183,9 @@ jobs:
                   root.addView(statusText, stLP)
 
                   processingOverlay = LinearLayout(this).apply { 
-                      orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setBackgroundColor(Color.parseColor("#AA000000")); visibility = View.GONE 
+                      orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setBackgroundColor(Color.parseColor("#E6000000")); visibility = View.GONE 
                   }
-                  processingOverlay.addView(TextView(this).apply { text = "UPGRADED TUKRE SYSTEM\nStitching 10 Frames..."; setTextColor(Color.GREEN); textSize = 22f; gravity = Gravity.CENTER })
+                  processingOverlay.addView(TextView(this).apply { text = "PROCESSING 10 FRAMES\nMerging Tukre System..."; setTextColor(Color.GREEN); textSize = 22f; gravity = Gravity.CENTER })
                   root.addView(processingOverlay, -1, -1)
 
                   setContentView(root)
@@ -217,7 +237,7 @@ jobs:
                   })
               }
 
-              private fun allPermissionsGranted() = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == 0
+              private fun allPermissionsGranted() = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
           }
           EOF
 
@@ -230,6 +250,6 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Zeeshan-Camera-V3-Pro
+          name: Zeeshan-Camera-V4-Fixed
           path: app/build/outputs/apk/debug/*.apk
 
