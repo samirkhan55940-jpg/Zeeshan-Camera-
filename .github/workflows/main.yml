@@ -32,6 +32,7 @@ jobs:
 
           echo "plugins { id 'com.android.application' version '8.1.0' apply false }" > build.gradle
 
+          # 🛠️ ERROR FIX WALA HISA YAHAN HAI (configurations.all)
           echo "plugins { id 'com.android.application' }
           android {
               namespace 'com.camera.superzoom4k'
@@ -46,6 +47,13 @@ jobs:
               compileOptions {
                   sourceCompatibility JavaVersion.VERSION_1_8
                   targetCompatibility JavaVersion.VERSION_1_8
+              }
+          }
+          configurations.all {
+              resolutionStrategy {
+                  force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
+                  force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22'
+                  force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22'
               }
           }
           dependencies {
@@ -82,7 +90,6 @@ jobs:
               </application>
           </manifest>" > app/src/main/AndroidManifest.xml
 
-          # 🛠️ FULL KOTLIN CODE FOR 4K + 50x ZOOM + TUKRE SYSTEM (Burst Mode Concept)
           cat << 'EOF' > app/src/main/java/com/camera/superzoom4k/MainActivity.kt
           package com.camera.superzoom4k
           
@@ -94,7 +101,6 @@ jobs:
           import android.graphics.drawable.GradientDrawable
           import android.os.Build
           import android.os.Bundle
-          import android.os.Environment
           import android.provider.MediaStore
           import android.util.Log
           import android.util.Size
@@ -106,7 +112,6 @@ jobs:
           import androidx.camera.view.PreviewView
           import androidx.core.app.ActivityCompat
           import androidx.core.content.ContextCompat
-          import java.io.File
           import java.text.SimpleDateFormat
           import java.util.*
           import java.util.concurrent.ExecutorService
@@ -120,19 +125,17 @@ jobs:
               private lateinit var statusText: TextView
               private var cameraControl: CameraControl? = null
               private val PERMISSIONS_REQUEST_CODE = 10
-              private val TUKRE_COUNT = 5 // Burst Count for "Tukre System" (lagataar kitni photos leni hain)
+              private val TUKRE_COUNT = 5
 
               override fun onCreate(savedInstanceState: Bundle?) {
                   super.onCreate(savedInstanceState)
                   
-                  // Programmatic UI Layout (100% single-file builder compatible)
                   val rootLayout = RelativeLayout(this)
                   rootLayout.setBackgroundColor(Color.parseColor("#121212"))
 
                   previewView = PreviewView(this)
                   rootLayout.addView(previewView, RelativeLayout.LayoutParams.MATCH_PARENT, RelativeLayout.LayoutParams.MATCH_PARENT)
 
-                  // 🎚️ ZOOM CONTROL (Seekbar for 1x to 50x Zoom)
                   zoomSeekBar = SeekBar(this)
                   zoomSeekBar.max = 50 
                   zoomSeekBar.progress = 0 
@@ -142,7 +145,6 @@ jobs:
                   seekBarParams.topMargin = 50
                   rootLayout.addView(zoomSeekBar, seekBarParams)
 
-                  // 📸 CAPTURE BUTTON (with "Tukre System" label)
                   val captureButton = TextView(this)
                   captureButton.text = "TAKE 4K PHOTO\n(with Tukre System)"
                   captureButton.gravity = Gravity.CENTER
@@ -150,7 +152,7 @@ jobs:
                   captureButton.typeface = Typeface.DEFAULT_BOLD
                   val shape = GradientDrawable()
                   shape.setShape(GradientDrawable.OVAL)
-                  shape.setColor(Color.parseColor("#FF1744")) // Vibrant Red
+                  shape.setColor(Color.parseColor("#FF1744"))
                   captureButton.background = shape
                   val captureBtnParams = RelativeLayout.LayoutParams(350, 350)
                   captureBtnParams.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM)
@@ -162,15 +164,11 @@ jobs:
                   statusText.setTextColor(Color.parseColor("#00E676"))
                   statusText.text = "System Initializing..."
                   statusText.gravity = Gravity.CENTER
-                  val statusParams = RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.MATCH_PARENT, 100)
-                  statusParams.addRule(RelativeLayout.ABOVE, captureButton.id) // This line may need fix if captureButton.id isn't set, better to use Layout params explicitly
-                  rootLayout.addView(statusText, statusParams)
-                  // Fixing status Params explicitly below status params is difficult programmatically without ID
                   val statusParamsFix = RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.MATCH_PARENT, 100)
                   statusParamsFix.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM)
                   statusParamsFix.bottomMargin = 450
-                  statusText.setLayoutParams(statusParamsFix)
-
+                  statusText.layoutParams = statusParamsFix
+                  rootLayout.addView(statusText)
 
                   setContentView(rootLayout)
 
@@ -182,7 +180,6 @@ jobs:
                       ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), PERMISSIONS_REQUEST_CODE)
                   }
 
-                  // ⚙️ Seekbar Listener for Zoom control
                   zoomSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                       override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                           val currentZoom = (progress + 1).toFloat() 
@@ -202,7 +199,6 @@ jobs:
                       val cameraProvider = cameraProviderFuture.get()
                       val preview = Preview.Builder().build().also { it.setSurfaceProvider(previewView.surfaceProvider) }
 
-                      // 💎 4K QUALITY SETUP: Set Target Resolution to 4K (3840x2160)
                       imageCapture = ImageCapture.Builder()
                           .setTargetResolution(Size(3840, 2160))
                           .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
@@ -215,48 +211,42 @@ jobs:
                           val camera = cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageCapture)
                           cameraControl = camera.cameraControl
                           
-                          // Set 1x zoom initially
                           cameraControl?.setZoomRatio(1f)
-                          statusText.text = "System Ready - 4K Configured (Zoom: 1x to 50x)"
-                          Log.d(\"CameraApp\", \"4K Camera Initialized with 50x Zoom Control.\")
+                          statusText.text = "System Ready - 4K Configured"
                       } catch (e: Exception) {
-                          Log.e(\"CameraApp\", \"Camera start failed: ${e.message}\")
-                          statusText.text = \"Camera Error\"
+                          Log.e("CameraApp", "Camera start failed: ${e.message}")
+                          statusText.text = "Camera Error"
                       }
                   }, ContextCompat.getMainExecutor(this))
               }
 
-              // 🧩 TUKRE SYSTEM: Lagataar multiple photos capture karke 'stitching' ka concept create karna
               private fun takePhotoWithTukreSystem() {
-                  statusText.text = \"Tukre System Active: Capturing $TUKRE_COUNT frames...\"
-                  val timestamp = SimpleDateFormat(\"yyyyMMdd_HHmmss\", Locale.US).format(Date())
+                  statusText.text = "Tukre System Active: Capturing $TUKRE_COUNT frames..."
+                  val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
                   
-                  // Reset zoom for stitching frames (conceptual)
                   val originalZoom = zoomSeekBar.progress.toFloat() + 1
-                  cameraControl?.setZoomRatio(1f) // Stitching conceptual: Use wide angle conceptual
+                  cameraControl?.setZoomRatio(1f) 
 
                   for (i in 1..TUKRE_COUNT) {
                       cameraExecutor.execute {
                           savePhoto(timestamp, i, originalZoom)
                       }
-                      Thread.sleep(200) // Delay between burst captures (essential conceptually for Tukre System)
+                      Thread.sleep(200) 
                   }
                   
-                  // Restore original user-set zoom
                   cameraControl?.setZoomRatio(originalZoom)
-                  statusText.text = \"✅ SUCCESS: Burst Captured in Pictures/SuperZoom4K\"
+                  statusText.text = "✅ SUCCESS: Saved in Pictures/SuperZoom4K"
               }
 
-              // Save a single photo to MediaStore (Pictures gallery)
               private fun savePhoto(timestamp: String, frameNumber: Int, currentZoom: Float) {
                   val imageCapture = imageCapture ?: return
 
-                  val name = \"4K_SuperZoom_${timestamp}_Frame${frameNumber}_${currentZoom}x\"
+                  val name = "4K_SuperZoom_${timestamp}_Frame${frameNumber}_${currentZoom}x"
                   val contentValues = ContentValues().apply {
                       put(MediaStore.MediaColumns.DISPLAY_NAME, name)
-                      put(MediaStore.MediaColumns.MIME_TYPE, \"image/jpeg\")
+                      put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
                       if (Build.VERSION.SDK_INT > Build.VERSION_CODES.P) {
-                          put(MediaStore.Images.Media.RELATIVE_PATH, \"Pictures/SuperZoom4K\")
+                          put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/SuperZoom4K")
                       }
                   }
 
@@ -271,10 +261,10 @@ jobs:
                       cameraExecutor,
                       object : ImageCapture.OnImageSavedCallback {
                           override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
-                              Log.d(\"CameraApp\", \"Frame $frameNumber saved: ${outputFileResults.savedUri}\")
+                              Log.d("CameraApp", "Frame $frameNumber saved")
                           }
                           override fun onError(exception: ImageCaptureException) {
-                              Log.e(\"CameraApp\", \"Frame $frameNumber capture failed: ${exception.message}\")
+                              Log.e("CameraApp", "Frame error: ${exception.message}")
                           }
                       }
                   )
@@ -290,7 +280,7 @@ jobs:
                       if (allPermissionsGranted()) {
                           startCamera()
                       } else {
-                          Toast.makeText(this, \"Camera Permission Needed\", Toast.LENGTH_SHORT).show()
+                          Toast.makeText(this, "Camera Permission Needed", Toast.LENGTH_SHORT).show()
                       }
                   }
               }
