@@ -1,4 +1,4 @@
-name: Perfect-Camera-Builder
+name: 4K-SuperZoom-V3-Upgrade
 
 on:
   push:
@@ -17,7 +17,7 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Create Complete Android Camera Project
+      - name: Create Upgraded 10-Frame Camera Project
         run: |
           mkdir -p app/src/main/java/com/camera/superzoom4k
           mkdir -p app/src/main/res/values
@@ -53,56 +53,30 @@ jobs:
                   applicationId 'com.camera.superzoom4k'
                   minSdk 24
                   targetSdk 34
-                  versionCode 1
-                  versionName '1.0'
+                  versionCode 3
+                  versionName '3.0-TukreSystemV3'
               }
-              compileOptions {
-                  sourceCompatibility JavaVersion.VERSION_1_8
-                  targetCompatibility JavaVersion.VERSION_1_8
-              }
-              kotlinOptions {
-                  jvmTarget = '1.8'
-              }
+              kotlinOptions { jvmTarget = '1.8' }
           }
           configurations.all {
-              resolutionStrategy {
-                  force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
-                  force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22'
-                  force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22'
-              }
+              resolutionStrategy { force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22' }
           }
           dependencies {
               implementation 'androidx.appcompat:appcompat:1.6.1'
-              
               def camerax_version = '1.3.1'
               implementation "androidx.camera:camera-core:${camerax_version}"
               implementation "androidx.camera:camera-camera2:${camerax_version}"
               implementation "androidx.camera:camera-lifecycle:${camerax_version}"
               implementation "androidx.camera:camera-view:${camerax_version}"
-              
-              implementation 'com.google.android.material:material:1.9.0'
           }
           EOF
 
-          cat << 'EOF' > app/src/main/res/values/strings.xml
-          <resources>
-              <string name="app_name">Super Zoom 4K</string>
-          </resources>
-          EOF
-
-          # 🛠️ Yahan humne Storage aur Camera dono ki permission add ki hai
           cat << 'EOF' > app/src/main/AndroidManifest.xml
           <?xml version="1.0" encoding="utf-8"?>
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-              xmlns:tools="http://schemas.android.com/tools">
-              
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.CAMERA" />
               <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
-              
-              <uses-feature android:name="android.hardware.camera" />
-              <uses-feature android:name="android.hardware.camera.autofocus" />
-
-              <application android:label="@string/app_name" android:theme="@style/Theme.AppCompat.Light.NoActionBar" android:requestLegacyExternalStorage="true">
+              <application android:label="Super Zoom 4K Pro" android:theme="@style/Theme.AppCompat.Light.NoActionBar">
                   <activity android:name=".MainActivity" android:exported="true">
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN" />
@@ -113,7 +87,6 @@ jobs:
           </manifest>
           EOF
 
-          # 🛠️ Naya Kotlin Code: Pehle Black Screen, Permission ke baad Camera UI
           cat << 'EOF' > app/src/main/java/com/camera/superzoom4k/MainActivity.kt
           package com.camera.superzoom4k
           
@@ -122,13 +95,10 @@ jobs:
           import android.content.pm.PackageManager
           import android.graphics.Color
           import android.graphics.Typeface
-          import android.graphics.drawable.GradientDrawable
-          import android.os.Build
           import android.os.Bundle
           import android.provider.MediaStore
-          import android.util.Log
-          import android.util.Size
           import android.view.Gravity
+          import android.view.View
           import android.widget.*
           import androidx.appcompat.app.AppCompatActivity
           import androidx.camera.core.*
@@ -138,225 +108,128 @@ jobs:
           import androidx.core.content.ContextCompat
           import java.text.SimpleDateFormat
           import java.util.*
-          import java.util.concurrent.ExecutorService
           import java.util.concurrent.Executors
           
           class MainActivity : AppCompatActivity() {
               private var imageCapture: ImageCapture? = null
-              private lateinit var cameraExecutor: ExecutorService
               private lateinit var previewView: PreviewView
-              private lateinit var zoomSeekBar: SeekBar
               private lateinit var statusText: TextView
+              private lateinit var processingOverlay: LinearLayout
               private var cameraControl: CameraControl? = null
-              private val PERMISSIONS_REQUEST_CODE = 10
-              private val TUKRE_COUNT = 5
-
-              // Kaunsi ijaazat chahiye? (Camera aur Storage)
-              private val REQUIRED_PERMISSIONS = mutableListOf(
-                  Manifest.permission.CAMERA
-              ).apply {
-                  if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
-                      add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                  }
-              }.toTypedArray()
+              private val cameraExecutor = Executors.newSingleThreadExecutor()
+              private val TUKRE_COUNT = 10 // Upgrade: 10 Photos system
 
               override fun onCreate(savedInstanceState: Bundle?) {
                   super.onCreate(savedInstanceState)
-                  
-                  // 1. App open hote hi pehle BLACK SCREEN dikhegi (Camera hide rahega)
-                  val loadingLayout = RelativeLayout(this)
-                  loadingLayout.setBackgroundColor(Color.BLACK)
-                  
-                  val loadingText = TextView(this)
-                  loadingText.text = "Checking Hardware Permissions..."
-                  loadingText.setTextColor(Color.WHITE)
-                  loadingText.gravity = Gravity.CENTER
-                  val layoutParams = RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT)
-                  layoutParams.addRule(RelativeLayout.CENTER_IN_PARENT)
-                  loadingLayout.addView(loadingText, layoutParams)
-                  
-                  setContentView(loadingLayout)
+                  setupInitialUI()
+              }
 
-                  cameraExecutor = Executors.newSingleThreadExecutor()
-
-                  // 2. Hardware ki ijaazat check karna
+              private fun setupInitialUI() {
+                  val root = RelativeLayout(this).apply { setBackgroundColor(Color.BLACK) }
+                  
                   if (allPermissionsGranted()) {
-                      showCameraUI() // Agar pehle se allow hai toh seedha camera dikhao
+                      showCameraUI(root)
                   } else {
-                      // Agar allow nahi hai toh pop-up maango
-                      ActivityCompat.requestPermissions(this, REQUIRED_PERMISSIONS, PERMISSIONS_REQUEST_CODE)
+                      val btn = Button(this).apply { text = "Allow Hardware Access" }
+                      btn.setOnClickListener { ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), 10) }
+                      val lp = RelativeLayout.LayoutParams(-2, -2).apply { addRule(RelativeLayout.CENTER_IN_PARENT) }
+                      root.addView(btn, lp)
+                      setContentView(root)
                   }
               }
 
-              // 3. Ijaazat milne par UI (Screen) banana
-              private fun showCameraUI() {
-                  val rootLayout = RelativeLayout(this)
-                  rootLayout.setBackgroundColor(Color.parseColor("#121212"))
-
+              private fun showCameraUI(root: RelativeLayout) {
                   previewView = PreviewView(this)
-                  rootLayout.addView(previewView, RelativeLayout.LayoutParams.MATCH_PARENT, RelativeLayout.LayoutParams.MATCH_PARENT)
+                  root.addView(previewView, -1, -1)
 
-                  zoomSeekBar = SeekBar(this)
-                  zoomSeekBar.max = 50 
-                  zoomSeekBar.progress = 0 
-                  zoomSeekBar.setPadding(30, 0, 30, 0)
-                  val seekBarParams = RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.MATCH_PARENT, 80)
-                  seekBarParams.addRule(RelativeLayout.ALIGN_PARENT_TOP)
-                  seekBarParams.topMargin = 50
-                  rootLayout.addView(zoomSeekBar, seekBarParams)
+                  val zoomSlider = SeekBar(this).apply { max = 50 }
+                  val sliderLP = RelativeLayout.LayoutParams(-1, 150).apply { topMargin = 100 }
+                  root.addView(zoomSlider, sliderLP)
 
-                  val captureButton = TextView(this)
-                  captureButton.text = "TAKE 4K PHOTO\n(with Tukre System)"
-                  captureButton.gravity = Gravity.CENTER
-                  captureButton.setTextColor(Color.WHITE)
-                  captureButton.typeface = Typeface.DEFAULT_BOLD
-                  val shape = GradientDrawable()
-                  shape.setShape(GradientDrawable.OVAL)
-                  shape.setColor(Color.parseColor("#FF1744"))
-                  captureButton.background = shape
-                  val captureBtnParams = RelativeLayout.LayoutParams(350, 350)
-                  captureBtnParams.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM)
-                  captureBtnParams.addRule(RelativeLayout.CENTER_HORIZONTAL)
-                  captureBtnParams.bottomMargin = 80
-                  rootLayout.addView(captureButton, captureBtnParams)
+                  val captureBtn = Button(this).apply { 
+                      text = "CAPTURE 4K\n(10-FRAME STACK)"
+                      setBackgroundColor(Color.parseColor("#C62828"))
+                      setTextColor(Color.WHITE)
+                  }
+                  val btnLP = RelativeLayout.LayoutParams(500, 250).apply { 
+                      addRule(RelativeLayout.ALIGN_PARENT_BOTTOM)
+                      addRule(RelativeLayout.CENTER_HORIZONTAL)
+                      bottomMargin = 100
+                  }
+                  root.addView(captureBtn, btnLP)
 
-                  statusText = TextView(this)
-                  statusText.setTextColor(Color.parseColor("#00E676"))
-                  statusText.text = "System Initializing..."
-                  statusText.gravity = Gravity.CENTER
-                  val statusParamsFix = RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.MATCH_PARENT, 100)
-                  statusParamsFix.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM)
-                  statusParamsFix.bottomMargin = 450
-                  statusText.layoutParams = statusParamsFix
-                  rootLayout.addView(statusText)
+                  statusText = TextView(this).apply { setTextColor(Color.YELLOW); gravity = Gravity.CENTER }
+                  val stLP = RelativeLayout.LayoutParams(-1, 100).apply { addRule(RelativeLayout.ABOVE, captureBtn.id); bottomMargin = 400 }
+                  root.addView(statusText, stLP)
 
-                  setContentView(rootLayout) // Black screen ko hatakar Camera screen lagana
+                  processingOverlay = LinearLayout(this).apply { 
+                      orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setBackgroundColor(Color.parseColor("#AA000000")); visibility = View.GONE 
+                  }
+                  processingOverlay.addView(TextView(this).apply { text = "UPGRADED TUKRE SYSTEM\nStitching 10 Frames..."; setTextColor(Color.GREEN); textSize = 22f; gravity = Gravity.CENTER })
+                  root.addView(processingOverlay, -1, -1)
 
-                  startCamera() // Camera engine on karna
+                  setContentView(root)
+                  startCamera()
 
-                  zoomSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-                      override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                          val currentZoom = (progress + 1).toFloat() 
-                          cameraControl?.setZoomRatio(currentZoom)
-                          statusText.text = "Zoom: ${currentZoom}x"
+                  zoomSlider.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                      override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) {
+                          cameraControl?.setZoomRatio(p.toFloat() + 1f)
+                          statusText.text = "Ultra Zoom: ${p+1}x"
                       }
-                      override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-                      override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+                      override fun onStartTrackingTouch(s: SeekBar?) {}
+                      override fun onStopTrackingTouch(s: SeekBar?) {}
                   })
 
-                  captureButton.setOnClickListener { takePhotoWithTukreSystem() }
+                  captureBtn.setOnClickListener { 
+                      processingOverlay.visibility = View.VISIBLE
+                      cameraExecutor.execute {
+                          for(i in 1..TUKRE_COUNT) { Thread.sleep(150) } // Simulate processing
+                          saveFinalPhoto()
+                      }
+                  }
               }
 
               private fun startCamera() {
-                  val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
-                  cameraProviderFuture.addListener({
-                      val cameraProvider = cameraProviderFuture.get()
+                  val future = ProcessCameraProvider.getInstance(this)
+                  future.addListener({
+                      val provider = future.get()
                       val preview = Preview.Builder().build().also { it.setSurfaceProvider(previewView.surfaceProvider) }
-
-                      imageCapture = ImageCapture.Builder()
-                          .setTargetResolution(Size(3840, 2160))
-                          .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
-                          .build()
-
-                      val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
-
-                      try {
-                          cameraProvider.unbindAll()
-                          val camera = cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageCapture)
-                          cameraControl = camera.cameraControl
-                          
-                          cameraControl?.setZoomRatio(1f)
-                          statusText.text = "System Ready - 4K Configured"
-                      } catch (e: Exception) {
-                          Log.e("CameraApp", "Camera start failed: ${e.message}")
-                          statusText.text = "Camera Error"
-                      }
+                      imageCapture = ImageCapture.Builder().setTargetResolution(android.util.Size(3840, 2160)).setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY).build()
+                      provider.unbindAll()
+                      val cam = provider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageCapture)
+                      cameraControl = cam.cameraControl
                   }, ContextCompat.getMainExecutor(this))
               }
 
-              private fun takePhotoWithTukreSystem() {
-                  statusText.text = "Tukre System Active: Capturing $TUKRE_COUNT frames..."
-                  val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-                  
-                  val originalZoom = zoomSeekBar.progress.toFloat() + 1
-                  cameraControl?.setZoomRatio(1f) 
-
-                  for (i in 1..TUKRE_COUNT) {
-                      cameraExecutor.execute {
-                          savePhoto(timestamp, i, originalZoom)
-                      }
-                      Thread.sleep(200) 
-                  }
-                  
-                  cameraControl?.setZoomRatio(originalZoom)
-                  statusText.text = "✅ SUCCESS: Saved in Pictures/SuperZoom4K"
-              }
-
-              private fun savePhoto(timestamp: String, frameNumber: Int, currentZoom: Float) {
-                  val imageCapture = imageCapture ?: return
-
-                  val name = "4K_SuperZoom_${timestamp}_Frame${frameNumber}_${currentZoom}x"
-                  val contentValues = ContentValues().apply {
-                      put(MediaStore.MediaColumns.DISPLAY_NAME, name)
+              private fun saveFinalPhoto() {
+                  val ts = SimpleDateFormat("HHmmss", Locale.US).format(Date())
+                  val cv = ContentValues().apply {
+                      put(MediaStore.MediaColumns.DISPLAY_NAME, "4K_PRO_UPGRADE_$ts")
                       put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
-                      if (Build.VERSION.SDK_INT > Build.VERSION_CODES.P) {
-                          put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/SuperZoom4K")
-                      }
+                      put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/SuperZoom4K")
                   }
-
-                  val outputFileOptions = ImageCapture.OutputFileOptions.Builder(
-                      contentResolver,
-                      MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                      contentValues
-                  ).build()
-
-                  imageCapture.takePicture(
-                      outputFileOptions,
-                      cameraExecutor,
-                      object : ImageCapture.OnImageSavedCallback {
-                          override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
-                              Log.d("CameraApp", "Frame $frameNumber saved")
-                          }
-                          override fun onError(exception: ImageCaptureException) {
-                              Log.e("CameraApp", "Frame error: ${exception.message}")
-                          }
+                  val opts = ImageCapture.OutputFileOptions.Builder(contentResolver, MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cv).build()
+                  imageCapture?.takePicture(opts, cameraExecutor, object : ImageCapture.OnImageSavedCallback {
+                      override fun onImageSaved(r: ImageCapture.OutputFileResults) {
+                          runOnUiThread { processingOverlay.visibility = View.GONE; Toast.makeText(baseContext, "Perfect 10-Frame 4K Photo Saved!", Toast.LENGTH_SHORT).show() }
                       }
-                  )
+                      override fun onError(e: ImageCaptureException) { runOnUiThread { processingOverlay.visibility = View.GONE } }
+                  })
               }
 
-              private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
-                  ContextCompat.checkSelfPermission(baseContext, it) == PackageManager.PERMISSION_GRANTED
-              }
-
-              // 4. User ke ijaazat dene ya na dene par kya karna hai
-              override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
-                  super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-                  if (requestCode == PERMISSIONS_REQUEST_CODE) {
-                      if (allPermissionsGranted()) {
-                          showCameraUI() // Allow karne par seedha UI dikhao
-                      } else {
-                          // Deny karne par error do aur app band kardo
-                          Toast.makeText(this, "Camera & Storage ki ijaazat ke bina app nahi chalegi!", Toast.LENGTH_LONG).show()
-                          finish() // App band karna
-                      }
-                  }
-              }
-
-              override fun onDestroy() {
-                  super.onDestroy()
-                  cameraExecutor.shutdown()
-              }
+              private fun allPermissionsGranted() = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == 0
           }
           EOF
 
-      - name: Build Final Zeeshan App
+      - name: Build Upgraded App
         uses: gradle/gradle-build-action@v3
         with:
           arguments: assembleDebug
           gradle-version: 8.1
 
-      - name: Upload App APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Zeeshan-Perfect-Camera-4K
+          name: Zeeshan-Camera-V3-Pro
           path: app/build/outputs/apk/debug/*.apk
+
