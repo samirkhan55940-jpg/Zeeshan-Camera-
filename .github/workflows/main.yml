@@ -1,0 +1,316 @@
+name: 4K-SuperZoom-Camera-Builder
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Create Complete Android Camera Project
+        run: |
+          mkdir -p app/src/main/java/com/camera/superzoom4k
+          mkdir -p app/src/main/res/values
+
+          echo "android.useAndroidX=true
+          android.enableJetifier=true
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8" > gradle.properties
+
+          echo "pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
+          dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }
+          include ':app'" > settings.gradle
+
+          echo "plugins { id 'com.android.application' version '8.1.0' apply false }" > build.gradle
+
+          echo "plugins { id 'com.android.application' }
+          android {
+              namespace 'com.camera.superzoom4k'
+              compileSdk 34
+              defaultConfig {
+                  applicationId 'com.camera.superzoom4k'
+                  minSdk 24
+                  targetSdk 34
+                  versionCode 1
+                  versionName '1.0'
+              }
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_1_8
+                  targetCompatibility JavaVersion.VERSION_1_8
+              }
+          }
+          dependencies {
+              implementation 'androidx.appcompat:appcompat:1.6.1'
+              
+              // CameraX dependencies
+              def camerax_version = '1.3.1'
+              implementation \"androidx.camera:camera-core:\${camerax_version}\"
+              implementation \"androidx.camera:camera-camera2:\${camerax_version}\"
+              implementation \"androidx.camera:camera-lifecycle:\${camerax_version}\"
+              implementation \"androidx.camera:camera-view:\${camerax_version}\"
+              
+              implementation 'com.google.android.material:material:1.9.0'
+          }" > app/build.gradle
+
+          echo "<resources>
+              <string name=\"app_name\">Super Zoom 4K</string>
+          </resources>" > app/src/main/res/values/strings.xml
+
+          echo "<?xml version=\"1.0\" encoding=\"utf-8\"?>
+          <manifest xmlns:android=\"http://schemas.android.com/apk/res/android\"
+              xmlns:tools=\"http://schemas.android.com/tools\">
+              <uses-permission android:name=\"android.permission.CAMERA\" />
+              <uses-feature android:name=\"android.hardware.camera\" />
+              <uses-feature android:name=\"android.hardware.camera.autofocus\" />
+
+              <application android:label=\"@string/app_name\" android:theme=\"@style/Theme.AppCompat.Light.NoActionBar\" android:requestLegacyExternalStorage=\"true\">
+                  <activity android:name=\".MainActivity\" android:exported=\"true\">
+                      <intent-filter>
+                          <action android:name=\"android.intent.action.MAIN\" />
+                          <category android:name=\"android.intent.category.LAUNCHER\" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>" > app/src/main/AndroidManifest.xml
+
+          # 🛠️ FULL KOTLIN CODE FOR 4K + 50x ZOOM + TUKRE SYSTEM (Burst Mode Concept)
+          cat << 'EOF' > app/src/main/java/com/camera/superzoom4k/MainActivity.kt
+          package com.camera.superzoom4k
+          
+          import android.Manifest
+          import android.content.ContentValues
+          import android.content.pm.PackageManager
+          import android.graphics.Color
+          import android.graphics.Typeface
+          import android.graphics.drawable.GradientDrawable
+          import android.os.Build
+          import android.os.Bundle
+          import android.os.Environment
+          import android.provider.MediaStore
+          import android.util.Log
+          import android.util.Size
+          import android.view.Gravity
+          import android.widget.*
+          import androidx.appcompat.app.AppCompatActivity
+          import androidx.camera.core.*
+          import androidx.camera.lifecycle.ProcessCameraProvider
+          import androidx.camera.view.PreviewView
+          import androidx.core.app.ActivityCompat
+          import androidx.core.content.ContextCompat
+          import java.io.File
+          import java.text.SimpleDateFormat
+          import java.util.*
+          import java.util.concurrent.ExecutorService
+          import java.util.concurrent.Executors
+          
+          class MainActivity : AppCompatActivity() {
+              private var imageCapture: ImageCapture? = null
+              private lateinit var cameraExecutor: ExecutorService
+              private lateinit var previewView: PreviewView
+              private lateinit var zoomSeekBar: SeekBar
+              private lateinit var statusText: TextView
+              private var cameraControl: CameraControl? = null
+              private val PERMISSIONS_REQUEST_CODE = 10
+              private val TUKRE_COUNT = 5 // Burst Count for "Tukre System" (lagataar kitni photos leni hain)
+
+              override fun onCreate(savedInstanceState: Bundle?) {
+                  super.onCreate(savedInstanceState)
+                  
+                  // Programmatic UI Layout (100% single-file builder compatible)
+                  val rootLayout = RelativeLayout(this)
+                  rootLayout.setBackgroundColor(Color.parseColor("#121212"))
+
+                  previewView = PreviewView(this)
+                  rootLayout.addView(previewView, RelativeLayout.LayoutParams.MATCH_PARENT, RelativeLayout.LayoutParams.MATCH_PARENT)
+
+                  // 🎚️ ZOOM CONTROL (Seekbar for 1x to 50x Zoom)
+                  zoomSeekBar = SeekBar(this)
+                  zoomSeekBar.max = 50 
+                  zoomSeekBar.progress = 0 
+                  zoomSeekBar.setPadding(30, 0, 30, 0)
+                  val seekBarParams = RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.MATCH_PARENT, 80)
+                  seekBarParams.addRule(RelativeLayout.ALIGN_PARENT_TOP)
+                  seekBarParams.topMargin = 50
+                  rootLayout.addView(zoomSeekBar, seekBarParams)
+
+                  // 📸 CAPTURE BUTTON (with "Tukre System" label)
+                  val captureButton = TextView(this)
+                  captureButton.text = "TAKE 4K PHOTO\n(with Tukre System)"
+                  captureButton.gravity = Gravity.CENTER
+                  captureButton.setTextColor(Color.WHITE)
+                  captureButton.typeface = Typeface.DEFAULT_BOLD
+                  val shape = GradientDrawable()
+                  shape.setShape(GradientDrawable.OVAL)
+                  shape.setColor(Color.parseColor("#FF1744")) // Vibrant Red
+                  captureButton.background = shape
+                  val captureBtnParams = RelativeLayout.LayoutParams(350, 350)
+                  captureBtnParams.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM)
+                  captureBtnParams.addRule(RelativeLayout.CENTER_HORIZONTAL)
+                  captureBtnParams.bottomMargin = 80
+                  rootLayout.addView(captureButton, captureBtnParams)
+
+                  statusText = TextView(this)
+                  statusText.setTextColor(Color.parseColor("#00E676"))
+                  statusText.text = "System Initializing..."
+                  statusText.gravity = Gravity.CENTER
+                  val statusParams = RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.MATCH_PARENT, 100)
+                  statusParams.addRule(RelativeLayout.ABOVE, captureButton.id) // This line may need fix if captureButton.id isn't set, better to use Layout params explicitly
+                  rootLayout.addView(statusText, statusParams)
+                  // Fixing status Params explicitly below status params is difficult programmatically without ID
+                  val statusParamsFix = RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.MATCH_PARENT, 100)
+                  statusParamsFix.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM)
+                  statusParamsFix.bottomMargin = 450
+                  statusText.setLayoutParams(statusParamsFix)
+
+
+                  setContentView(rootLayout)
+
+                  cameraExecutor = Executors.newSingleThreadExecutor()
+
+                  if (allPermissionsGranted()) {
+                      startCamera()
+                  } else {
+                      ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), PERMISSIONS_REQUEST_CODE)
+                  }
+
+                  // ⚙️ Seekbar Listener for Zoom control
+                  zoomSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                      override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                          val currentZoom = (progress + 1).toFloat() 
+                          cameraControl?.setZoomRatio(currentZoom)
+                          statusText.text = "Zoom: ${currentZoom}x"
+                      }
+                      override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+                      override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+                  })
+
+                  captureButton.setOnClickListener { takePhotoWithTukreSystem() }
+              }
+
+              private fun startCamera() {
+                  val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
+                  cameraProviderFuture.addListener({
+                      val cameraProvider = cameraProviderFuture.get()
+                      val preview = Preview.Builder().build().also { it.setSurfaceProvider(previewView.surfaceProvider) }
+
+                      // 💎 4K QUALITY SETUP: Set Target Resolution to 4K (3840x2160)
+                      imageCapture = ImageCapture.Builder()
+                          .setTargetResolution(Size(3840, 2160))
+                          .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
+                          .build()
+
+                      val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+
+                      try {
+                          cameraProvider.unbindAll()
+                          val camera = cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageCapture)
+                          cameraControl = camera.cameraControl
+                          
+                          // Set 1x zoom initially
+                          cameraControl?.setZoomRatio(1f)
+                          statusText.text = "System Ready - 4K Configured (Zoom: 1x to 50x)"
+                          Log.d(\"CameraApp\", \"4K Camera Initialized with 50x Zoom Control.\")
+                      } catch (e: Exception) {
+                          Log.e(\"CameraApp\", \"Camera start failed: ${e.message}\")
+                          statusText.text = \"Camera Error\"
+                      }
+                  }, ContextCompat.getMainExecutor(this))
+              }
+
+              // 🧩 TUKRE SYSTEM: Lagataar multiple photos capture karke 'stitching' ka concept create karna
+              private fun takePhotoWithTukreSystem() {
+                  statusText.text = \"Tukre System Active: Capturing $TUKRE_COUNT frames...\"
+                  val timestamp = SimpleDateFormat(\"yyyyMMdd_HHmmss\", Locale.US).format(Date())
+                  
+                  // Reset zoom for stitching frames (conceptual)
+                  val originalZoom = zoomSeekBar.progress.toFloat() + 1
+                  cameraControl?.setZoomRatio(1f) // Stitching conceptual: Use wide angle conceptual
+
+                  for (i in 1..TUKRE_COUNT) {
+                      cameraExecutor.execute {
+                          savePhoto(timestamp, i, originalZoom)
+                      }
+                      Thread.sleep(200) // Delay between burst captures (essential conceptually for Tukre System)
+                  }
+                  
+                  // Restore original user-set zoom
+                  cameraControl?.setZoomRatio(originalZoom)
+                  statusText.text = \"✅ SUCCESS: Burst Captured in Pictures/SuperZoom4K\"
+              }
+
+              // Save a single photo to MediaStore (Pictures gallery)
+              private fun savePhoto(timestamp: String, frameNumber: Int, currentZoom: Float) {
+                  val imageCapture = imageCapture ?: return
+
+                  val name = \"4K_SuperZoom_${timestamp}_Frame${frameNumber}_${currentZoom}x\"
+                  val contentValues = ContentValues().apply {
+                      put(MediaStore.MediaColumns.DISPLAY_NAME, name)
+                      put(MediaStore.MediaColumns.MIME_TYPE, \"image/jpeg\")
+                      if (Build.VERSION.SDK_INT > Build.VERSION_CODES.P) {
+                          put(MediaStore.Images.Media.RELATIVE_PATH, \"Pictures/SuperZoom4K\")
+                      }
+                  }
+
+                  val outputFileOptions = ImageCapture.OutputFileOptions.Builder(
+                      contentResolver,
+                      MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                      contentValues
+                  ).build()
+
+                  imageCapture.takePicture(
+                      outputFileOptions,
+                      cameraExecutor,
+                      object : ImageCapture.OnImageSavedCallback {
+                          override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
+                              Log.d(\"CameraApp\", \"Frame $frameNumber saved: ${outputFileResults.savedUri}\")
+                          }
+                          override fun onError(exception: ImageCaptureException) {
+                              Log.e(\"CameraApp\", \"Frame $frameNumber capture failed: ${exception.message}\")
+                          }
+                      }
+                  )
+              }
+
+              private fun allPermissionsGranted() = arrayOf(Manifest.permission.CAMERA).all {
+                  ContextCompat.checkSelfPermission(baseContext, it) == PackageManager.PERMISSION_GRANTED
+              }
+
+              override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
+                  super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+                  if (requestCode == PERMISSIONS_REQUEST_CODE) {
+                      if (allPermissionsGranted()) {
+                          startCamera()
+                      } else {
+                          Toast.makeText(this, \"Camera Permission Needed\", Toast.LENGTH_SHORT).show()
+                      }
+                  }
+              }
+
+              override fun onDestroy() {
+                  super.onDestroy()
+                  cameraExecutor.shutdown()
+              }
+          }
+          EOF
+
+      - name: Build Final Zeeshan App
+        uses: gradle/gradle-build-action@v3
+        with:
+          arguments: assembleDebug
+          gradle-version: 8.1
+
+      - name: Upload App APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Zeeshan-SuperZoom-Camera-4K
+          path: app/build/outputs/apk/debug/*.apk
+
