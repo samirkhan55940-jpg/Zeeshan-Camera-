@@ -1,4 +1,4 @@
-name: Zeeshan-Camera-Master-Hack-AI
+name: Zeeshan-Camera-C-Plus-Plus-Engine
 
 on:
   push:
@@ -18,16 +18,13 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Create Zeeshan Camera Project
+      - name: Create Zeeshan Native C++ Project
         run: |
           mkdir -p app/src/main/java/com/zeeshan/camera
           mkdir -p app/src/main/res/values
+          mkdir -p app/src/main/cpp
           
-          # 🧠 1. REAL AI DIMAAG DOWNLOAD
-          mkdir -p app/src/main/assets
-          echo "Downloading AI Brain..."
-          wget -qO app/src/main/assets/ai_dimaag.tflite https://storage.googleapis.com/download.tensorflow.org/models/tflite/gpu/mobile_ssd_v2_float_coco.tflite || touch app/src/main/assets/ai_dimaag.tflite
-
+          echo "Building Base Files..."
           cat << 'EOF' > gradle.properties
           android.useAndroidX=true
           android.enableJetifier=true
@@ -47,6 +44,69 @@ jobs:
           }
           EOF
 
+          # 🛠️ 1. CMAKE FILE (The Bridge Builder for C++)
+          cat << 'EOF' > app/src/main/cpp/CMakeLists.txt
+          cmake_minimum_required(VERSION 3.22.1)
+          project("zeeshancamera")
+          add_library(zee_native SHARED native-lib.cpp)
+          find_library(log-lib log)
+          find_library(jnigraphics-lib jnigraphics)
+          target_link_libraries(zee_native ${log-lib} ${jnigraphics-lib})
+          EOF
+
+          # 🔥 2. C++ ENGINE FILE (Real Hardware Level Pixel Processing)
+          cat << 'EOF' > app/src/main/cpp/native-lib.cpp
+          #include <jni.h>
+          #include <android/bitmap.h>
+          #include <android/log.h>
+          #include <cmath>
+
+          #define LOG_TAG "ZeeshanNative"
+          #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+
+          extern "C" JNIEXPORT void JNICALL
+          Java_com_zeeshan_camera_AiDriver_processImageNative(JNIEnv* env, jobject /* this */, jobject bitmap) {
+              AndroidBitmapInfo info;
+              void* pixels;
+              
+              if (AndroidBitmap_getInfo(env, bitmap, &info) < 0) return;
+              if (info.format != ANDROID_BITMAP_FORMAT_RGBA_8888) return;
+              if (AndroidBitmap_lockPixels(env, bitmap, &pixels) < 0) return;
+
+              // Zeeshan's C++ Hardware Sharpness & Contrast Engine
+              int width = info.width;
+              int height = info.height;
+              uint32_t* line = (uint32_t*)pixels;
+              
+              LOGI("C++ Engine Active: Processing %d x %d pixels", width, height);
+
+              for (int y = 0; y < height; y++) {
+                  for (int x = 0; x < width; x++) {
+                      uint32_t pixel = line[x];
+                      int a = (pixel >> 24) & 0xff;
+                      int r = (pixel >> 16) & 0xff;
+                      int g = (pixel >> 8) & 0xff;
+                      int b = pixel & 0xff;
+
+                      // Deep contrast math directly on hardware RAM
+                      r = (int)((r - 128) * 1.3 + 128 + 20); // Contrast + Brightness
+                      g = (int)((g - 128) * 1.3 + 128 + 20);
+                      b = (int)((b - 128) * 1.3 + 128 + 20);
+
+                      r = (r > 255) ? 255 : ((r < 0) ? 0 : r);
+                      g = (g > 255) ? 255 : ((g < 0) ? 0 : g);
+                      b = (b > 255) ? 255 : ((b < 0) ? 0 : b);
+
+                      line[x] = (a << 24) | (r << 16) | (g << 8) | b;
+                  }
+                  line = (uint32_t*)((char*)line + info.stride);
+              }
+              AndroidBitmap_unlockPixels(env, bitmap);
+              LOGI("C++ Processing Complete!");
+          }
+          EOF
+
+          # 📦 3. APP BUILD GRADLE (Telling Android to use C++)
           cat << 'EOF' > app/build.gradle
           plugins { 
               id 'com.android.application' 
@@ -59,14 +119,14 @@ jobs:
                   applicationId 'com.zeeshan.camera'
                   minSdk 24
                   targetSdk 34
-                  versionCode 9
-                  versionName '9.0-Master-Hack'
+                  versionCode 10
+                  versionName '10.0-CPP-Engine'
+                  externalNativeBuild { cmake { cppFlags "" } }
+              }
+              externalNativeBuild {
+                  cmake { path "src/main/cpp/CMakeLists.txt"; version "3.22.1" }
               }
               kotlinOptions { jvmTarget = '1.8' }
-              aaptOptions { noCompress "tflite" }
-          }
-          configurations.all {
-              resolutionStrategy { force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22' }
           }
           dependencies {
               implementation 'androidx.appcompat:appcompat:1.6.1'
@@ -75,27 +135,19 @@ jobs:
               implementation "androidx.camera:camera-camera2:${camerax_version}"
               implementation "androidx.camera:camera-lifecycle:${camerax_version}"
               implementation "androidx.camera:camera-view:${camerax_version}"
-              implementation 'org.tensorflow:tensorflow-lite:2.14.0'
-              // Location Tagging Dependency
-              implementation 'com.google.android.gms:play-services-location:21.0.1'
-              implementation 'androidx.exifinterface:exifinterface:1.3.6'
           }
           EOF
 
           cat << 'EOF' > app/src/main/res/values/strings.xml
-          <resources>
-              <string name="app_name">Zeeshan Pro AI</string>
-          </resources>
+          <resources><string name="app_name">Zeeshan C++ Pro</string></resources>
           EOF
 
-          # 📍 LOCATION & CAMERA PERMISSIONS ADDED
+          # 🛡️ NO LOCATION, ONLY CAMERA & STORAGE PERMISSIONS
           cat << 'EOF' > app/src/main/AndroidManifest.xml
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.CAMERA" />
               <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
-              <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-              <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
               <application android:label="@string/app_name" android:theme="@style/Theme.AppCompat.Light.NoActionBar">
                   <activity android:name=".MainActivity" android:exported="true">
                       <intent-filter>
@@ -107,49 +159,20 @@ jobs:
           </manifest>
           EOF
 
-          # ⚡ 2. THE AI DRIVER (Server is generating the complex math file automatically!)
+          # ⚡ 4. KOTLIN DRIVER CALLING C++
           cat << 'EOF' > app/src/main/java/com/zeeshan/camera/AiDriver.kt
           package com.zeeshan.camera
           import android.graphics.Bitmap
-          import android.graphics.Canvas
-          import android.graphics.ColorMatrix
-          import android.graphics.ColorMatrixColorFilter
-          import android.graphics.Paint
-          import org.tensorflow.lite.Interpreter
 
-          class AiDriver(private val tflite: Interpreter?) {
-              // Yeh function soye hue AI ko current deta hai aur pixels saaf karta hai
-              fun processAndWakeUpAI(inputBitmap: Bitmap): Bitmap {
-                  if (tflite == null) return inputBitmap // Failsafe
-                  
-                  // Simulating Tensor Math (Khatarnak Maths)
-                  val dest = Bitmap.createBitmap(inputBitmap.width, inputBitmap.height, inputBitmap.config)
-                  val canvas = Canvas(dest)
-                  val paint = Paint()
-                  
-                  // AI Super Resolution Simulation Filter
-                  val contrast = 1.3f
-                  val brightness = 2f
-                  val colorMatrix = ColorMatrix(floatArrayOf(
-                      contrast, 0f, 0f, 0f, brightness,
-                      0f, contrast, 0f, 0f, brightness,
-                      0f, 0f, contrast, 0f, brightness,
-                      0f, 0f, 0f, 1f, 0f
-                  ))
-                  paint.colorFilter = ColorMatrixColorFilter(colorMatrix)
-                  canvas.drawBitmap(inputBitmap, 0f, 0f, paint)
-                  
-                  // Sending dummy tensor to wake up the Interpreter
-                  try {
-                      tflite.run(arrayOf(floatArrayOf(0f)), arrayOf(floatArrayOf(0f)))
-                  } catch (e: Exception) {}
-                  
-                  return dest
+          class AiDriver {
+              companion object {
+                  init { System.loadLibrary("zee_native") } // Loading C++ Engine
               }
+              external fun processImageNative(bitmap: Bitmap) // Direct link to C++ File
           }
           EOF
 
-          # 📱 MAIN ACTIVITY CODE (Calling the Driver and Saving Location)
+          # 📱 5. MAIN ACTIVITY
           cat << 'EOF' > app/src/main/java/com/zeeshan/camera/MainActivity.kt
           package com.zeeshan.camera
           
@@ -161,7 +184,6 @@ jobs:
           import android.graphics.BitmapFactory
           import android.graphics.Color
           import android.graphics.Typeface
-          import android.location.Location
           import android.os.Bundle
           import android.provider.MediaStore
           import android.view.Gravity
@@ -174,10 +196,6 @@ jobs:
           import androidx.camera.view.PreviewView
           import androidx.core.app.ActivityCompat
           import androidx.core.content.ContextCompat
-          import com.google.android.gms.location.LocationServices
-          import org.tensorflow.lite.Interpreter
-          import java.io.FileInputStream
-          import java.nio.channels.FileChannel
           import java.text.SimpleDateFormat
           import java.util.*
           import java.util.concurrent.Executors
@@ -189,29 +207,15 @@ jobs:
               private lateinit var processingOverlay: LinearLayout
               private var cameraControl: CameraControl? = null
               private val cameraExecutor = Executors.newSingleThreadExecutor()
-              
-              private var aiDriver: AiDriver? = null
-              private var currentLocation: Location? = null
+              private val aiDriver = AiDriver()
 
               override fun onCreate(savedInstanceState: Bundle?) {
                   super.onCreate(savedInstanceState)
-                  loadAI()
-                  
-                  val permissions = arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION)
-                  if (permissions.all { ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED }) {
+                  if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
                       initCameraUI() 
                   } else {
-                      ActivityCompat.requestPermissions(this, permissions, 10)
+                      ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), 10)
                   }
-              }
-
-              private fun loadAI() {
-                  try {
-                      val fd = assets.openFd("ai_dimaag.tflite")
-                      val buffer = FileInputStream(fd.fileDescriptor).channel.map(FileChannel.MapMode.READ_ONLY, fd.startOffset, fd.declaredLength)
-                      val tflite = Interpreter(buffer, Interpreter.Options().apply { setNumThreads(4) })
-                      aiDriver = AiDriver(tflite) // Linking Driver to Brain
-                  } catch (e: Exception) {}
               }
 
               override fun onRequestPermissionsResult(rc: Int, perms: Array<String>, results: IntArray) {
@@ -219,32 +223,27 @@ jobs:
                   if (results.isNotEmpty() && results[0] == PackageManager.PERMISSION_GRANTED) initCameraUI() 
               }
 
-              @SuppressLint("ClickableViewAccessibility", "MissingPermission")
+              @SuppressLint("ClickableViewAccessibility")
               private fun initCameraUI() {
-                  // Fetch Location
-                  if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-                      LocationServices.getFusedLocationProviderClient(this).lastLocation.addOnSuccessListener { loc -> currentLocation = loc }
-                  }
-
                   val root = RelativeLayout(this).apply { setBackgroundColor(Color.BLACK) }
                   
                   previewView = PreviewView(this)
                   root.addView(previewView, -1, -1)
 
-                  val brandText = TextView(this).apply { text = "ZEESHAN PRO AI (GPS)"; setTextColor(Color.WHITE); textSize = 22f; typeface = Typeface.DEFAULT_BOLD }
+                  val brandText = TextView(this).apply { text = "ZEESHAN C++ ENGINE"; setTextColor(Color.WHITE); textSize = 22f; typeface = Typeface.DEFAULT_BOLD }
                   root.addView(brandText, RelativeLayout.LayoutParams(-2, -2).apply { addRule(RelativeLayout.CENTER_HORIZONTAL); topMargin = 50 })
 
                   val zoomSlider = SeekBar(this).apply { max = 90 }
                   root.addView(zoomSlider, RelativeLayout.LayoutParams(-1, 150).apply { topMargin = 150 })
 
-                  val captureBtn = Button(this).apply { text = "WAKE UP AI & CAPTURE"; setBackgroundColor(Color.parseColor("#00E676")); setTextColor(Color.BLACK); textSize = 16f; typeface = Typeface.DEFAULT_BOLD }
+                  val captureBtn = Button(this).apply { text = "CAPTURE 4K NATIVE"; setBackgroundColor(Color.parseColor("#00E676")); setTextColor(Color.BLACK); textSize = 16f; typeface = Typeface.DEFAULT_BOLD }
                   root.addView(captureBtn, RelativeLayout.LayoutParams(600, 200).apply { addRule(RelativeLayout.ALIGN_PARENT_BOTTOM); addRule(RelativeLayout.CENTER_HORIZONTAL); bottomMargin = 100 })
 
                   statusText = TextView(this).apply { setTextColor(Color.YELLOW); gravity = Gravity.CENTER; textSize = 16f }
                   root.addView(statusText, RelativeLayout.LayoutParams(-1, 100).apply { addRule(RelativeLayout.ABOVE, captureBtn.id); bottomMargin = 320 })
 
                   processingOverlay = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setBackgroundColor(Color.parseColor("#F2000000")); visibility = View.GONE }
-                  processingOverlay.addView(TextView(this).apply { text = "AI DRIVER ACTIVE...\nProcessing Pixels & Location"; setTextColor(Color.CYAN); textSize = 20f; gravity = Gravity.CENTER })
+                  processingOverlay.addView(TextView(this).apply { text = "C++ ENGINE PROCESSING...\nDirect Hardware Access"; setTextColor(Color.CYAN); textSize = 20f; gravity = Gravity.CENTER })
                   root.addView(processingOverlay, -1, -1)
 
                   setContentView(root)
@@ -269,7 +268,7 @@ jobs:
 
                   captureBtn.setOnClickListener { 
                       processingOverlay.visibility = View.VISIBLE
-                      takePhotoWithAI()
+                      takePhotoWithCPP()
                   }
               }
 
@@ -281,23 +280,26 @@ jobs:
                       provider.unbindAll()
                       val cam = provider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, Preview.Builder().build().also { it.setSurfaceProvider(previewView.surfaceProvider) }, imageCapture)
                       cameraControl = cam.cameraControl
-                      statusText.text = "AI System & GPS Ready"
+                      statusText.text = "C++ Engine & 4GB RAM Ready"
                   }, ContextCompat.getMainExecutor(this))
               }
 
-              private fun takePhotoWithAI() {
+              private fun takePhotoWithCPP() {
                   imageCapture?.takePicture(cameraExecutor, object : ImageCapture.OnImageCapturedCallback() {
                       override fun onCaptureSuccess(image: ImageProxy) {
                           try {
                               val buffer = image.planes[0].buffer
                               val bytes = ByteArray(buffer.capacity())
                               buffer.get(bytes)
+                              
+                              // Create mutable bitmap for C++ to modify directly in memory
                               val originalBitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, null)
+                              val mutableBitmap = originalBitmap.copy(Bitmap.Config.ARGB_8888, true)
                               
-                              // Calling the AiDriver to wake up AI and process maths!
-                              val finalBitmap = aiDriver?.processAndWakeUpAI(originalBitmap) ?: originalBitmap
+                              // 🔥 DIRECTLY SENDING TO C++ ENGINE 🔥
+                              aiDriver.processImageNative(mutableBitmap)
                               
-                              savePhoto(finalBitmap)
+                              savePhoto(mutableBitmap)
                           } finally { image.close() }
                       }
                       override fun onError(e: ImageCaptureException) { runOnUiThread { processingOverlay.visibility = View.GONE } }
@@ -307,14 +309,9 @@ jobs:
               private fun savePhoto(bitmap: Bitmap) {
                   val ts = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
                   val cv = ContentValues().apply {
-                      put(MediaStore.MediaColumns.DISPLAY_NAME, "ZEESHAN_PRO_" + ts + ".jpg")
+                      put(MediaStore.MediaColumns.DISPLAY_NAME, "ZEESHAN_NATIVE_" + ts + ".jpg")
                       put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
                       put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/ZeeshanCamera")
-                      // GPS Tagging Data
-                      if (currentLocation != null) {
-                          put(MediaStore.Images.Media.LATITUDE, currentLocation!!.latitude)
-                          put(MediaStore.Images.Media.LONGITUDE, currentLocation!!.longitude)
-                      }
                   }
                   
                   val uri = contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cv)
@@ -322,7 +319,7 @@ jobs:
                   
                   runOnUiThread { 
                       processingOverlay.visibility = View.GONE
-                      Toast.makeText(baseContext, "AI Photo Saved with Location Data!", Toast.LENGTH_LONG).show() 
+                      Toast.makeText(baseContext, "C++ Processed Photo Saved!", Toast.LENGTH_LONG).show() 
                   }
               }
               
@@ -330,15 +327,14 @@ jobs:
           }
           EOF
 
-      - name: Build Master Hack App
+      - name: Build Native C++ App
         uses: gradle/gradle-build-action@v3
         with:
           arguments: assembleDebug
           gradle-version: 8.1
 
-      - name: Upload Final APK
+      - name: Upload Native APK
         uses: actions/upload-artifact@v4
         with:
-          name: Zeeshan-Camera-Master-Hack
+          name: Zeeshan-Camera-Native-CPP
           path: app/build/outputs/apk/debug/*.apk
-
