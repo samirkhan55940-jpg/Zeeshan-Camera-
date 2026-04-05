@@ -1,4 +1,4 @@
-name: Zeeshan-Masterpiece-Computational-Camera
+name: Zeeshan-Hybrid-Stacking-Repair-Engine
 
 on:
   push:
@@ -18,13 +18,13 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Force GitHub to Build Zeeshan Masterpiece Engine
+      - name: Build Zeeshan Hybrid Engine
         run: |
           mkdir -p app/src/main/java/com/zeeshan/camera
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/cpp
           
-          echo "FORCING SERVER TO BUILD C++ TENSOR ENGINE..."
+          echo "BUILDING HYBRID STACKING & REPAIR ENGINE..."
 
           cat << 'EOF' > gradle.properties
           android.useAndroidX=true
@@ -45,99 +45,88 @@ jobs:
           }
           EOF
 
-          # 🛠️ 1. CMAKE ENGINE (Forcing C++ Compilation)
+          # 🛠️ 1. CMAKE ENGINE 
           cat << 'EOF' > app/src/main/cpp/CMakeLists.txt
           cmake_minimum_required(VERSION 3.22.1)
           project("zeeshancamera")
-          add_library(zee_masterpiece SHARED native-lib.cpp)
+          add_library(zee_hybrid SHARED native-lib.cpp)
           find_library(log-lib log)
           find_library(jnigraphics-lib jnigraphics)
-          target_link_libraries(zee_masterpiece ${log-lib} ${jnigraphics-lib})
+          target_link_libraries(zee_hybrid ${log-lib} ${jnigraphics-lib})
           EOF
 
-          # 🔥 2. THE MASTERPIECE C++ ENGINE (Data Cake Layering + Sharpening)
+          # 🔥 2. THE HYBRID C++ ENGINE (Stacking 5 Frames + Repairing)
           cat << 'EOF' > app/src/main/cpp/native-lib.cpp
           #include <jni.h>
           #include <android/bitmap.h>
           #include <android/log.h>
           #include <vector>
           #include <cmath>
+          #include <algorithm>
 
-          #define LOG_TAG "ZeeMasterpiece"
+          #define LOG_TAG "ZeeHybridEngine"
           #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 
           extern "C" JNIEXPORT void JNICALL
-          Java_com_zeeshan_camera_AiDriver_createMasterpiece(JNIEnv* env, jobject /* this */, jobjectArray bitmaps, jobject outputBitmap) {
+          Java_com_zeeshan_camera_AiDriver_processHybridStack(JNIEnv* env, jobject /* this */, jobjectArray bitmaps, jobject outputBitmap) {
               int num_frames = env->GetArrayLength(bitmaps);
-              if (num_frames < 2) return;
-
-              AndroidBitmapInfo output_info;
-              AndroidBitmap_getInfo(env, outputBitmap, &output_info);
-
+              AndroidBitmapInfo info;
+              AndroidBitmap_getInfo(env, outputBitmap, &info);
+              
+              int width = info.width;
+              int height = info.height;
+              
               std::vector<void*> pixel_ptrs(num_frames);
-              std::vector<AndroidBitmapInfo> info_ptrs(num_frames);
-
-              // RAM Hack: Lock all frames in memory simultaneously
               for (int i = 0; i < num_frames; i++) {
                   jobject bmp = env->GetObjectArrayElement(bitmaps, i);
-                  AndroidBitmap_getInfo(env, bmp, &info_ptrs[i]);
                   AndroidBitmap_lockPixels(env, bmp, &pixel_ptrs[i]);
               }
 
-              void* output_pixels;
-              AndroidBitmap_lockPixels(env, outputBitmap, &output_pixels);
+              void* out_pixels;
+              AndroidBitmap_lockPixels(env, outputBitmap, &out_pixels);
 
-              int width = output_info.width;
-              int height = output_info.height;
+              LOGI("Hybrid Engine: Stacking %d frames and applying Remaster...", num_frames);
 
-              LOGI("Zeeshan Engine Active: Forcing %d frames into 1 Masterpiece!", num_frames);
-
-              // 🧠 THE CAKE LAYERING MATH (Computational Photography)
+              // 🧠 STEP 1: STACKING (Pixel Averaging)
               for (int y = 0; y < height; y++) {
-                  uint32_t* out_line = (uint32_t*)output_pixels;
+                  uint32_t* out_line = (uint32_t*)out_pixels;
                   for (int x = 0; x < width; x++) {
                       int r_sum = 0, g_sum = 0, b_sum = 0;
-                      
-                      // Extracting data from all layers
                       for (int i = 0; i < num_frames; i++) {
-                          uint32_t* in_line = (uint32_t*)pixel_ptrs[i];
-                          uint32_t pixel = in_line[x];
+                          uint32_t pixel = ((uint32_t*)pixel_ptrs[i])[x];
                           r_sum += (pixel >> 16) & 0xff;
                           g_sum += (pixel >> 8) & 0xff;
                           b_sum += pixel & 0xff;
                       }
-
-                      // Averaging to remove NOISE and create pure data
+                      
+                      // Average value (Noise Reduction)
                       int r = r_sum / num_frames;
                       int g = g_sum / num_frames;
                       int b = b_sum / num_frames;
 
-                      // Smart Contrast Boost for 4K Detail
-                      r = (r > 128) ? r + 10 : r - 10;
-                      g = (g > 128) ? g + 10 : g - 10;
-                      b = (b > 128) ? b + 10 : b - 10;
+                      // 🧠 STEP 2: REPAIR (Contrast & Sharpness Boost)
+                      r = (int)((r - 128) * 1.2 + 128 + 10);
+                      g = (int)((g - 128) * 1.2 + 128 + 10);
+                      b = (int)((b - 128) * 1.2 + 128 + 10);
 
-                      r = (r > 255) ? 255 : ((r < 0) ? 0 : r);
-                      g = (g > 255) ? 255 : ((g < 0) ? 0 : g);
-                      b = (b > 255) ? 255 : ((b < 0) ? 0 : b);
+                      r = std::max(0, std::min(255, r));
+                      g = std::max(0, std::min(255, g));
+                      b = std::max(0, std::min(255, b));
 
                       out_line[x] = (0xFF << 24) | (r << 16) | (g << 8) | b;
                   }
-                  
-                  // Shift rows
-                  output_pixels = (uint32_t*)((char*)output_pixels + output_info.stride);
+                  out_pixels = (uint32_t*)((char*)out_pixels + info.stride);
                   for (int i = 0; i < num_frames; i++) {
-                      pixel_ptrs[i] = (uint32_t*)((char*)pixel_ptrs[i] + info_ptrs[i].stride);
+                      pixel_ptrs[i] = (uint32_t*)((char*)pixel_ptrs[i] + info.stride);
                   }
               }
 
-              // Release RAM
+              // Unlock everything
               AndroidBitmap_unlockPixels(env, outputBitmap);
               for (int i = 0; i < num_frames; i++) {
                   jobject bmp = env->GetObjectArrayElement(bitmaps, i);
                   AndroidBitmap_unlockPixels(env, bmp);
               }
-              LOGI("Masterpiece Created Successfully!");
           }
           EOF
 
@@ -154,9 +143,9 @@ jobs:
                   applicationId 'com.zeeshan.camera'
                   minSdk 24
                   targetSdk 34
-                  versionCode 12
-                  versionName '12.0-Masterpiece-Engine'
-                  externalNativeBuild { cmake { cppFlags "-O3 -ffast-math" } } // Forcing MAX SPEED
+                  versionCode 14
+                  versionName '14.0-Hybrid-Stack'
+                  externalNativeBuild { cmake { cppFlags "-O3" } } 
               }
               externalNativeBuild { cmake { path "src/main/cpp/CMakeLists.txt"; version "3.22.1" } }
               kotlinOptions { jvmTarget = '1.8' }
@@ -172,7 +161,7 @@ jobs:
           EOF
 
           cat << 'EOF' > app/src/main/res/values/strings.xml
-          <resources><string name="app_name">Zee Masterpiece</string></resources>
+          <resources><string name="app_name">Zeeshan Hybrid 5X</string></resources>
           EOF
 
           cat << 'EOF' > app/src/main/AndroidManifest.xml
@@ -191,20 +180,20 @@ jobs:
           </manifest>
           EOF
 
-          # ⚡ 4. KOTLIN DRIVER CALLING THE C++ ENGINE
+          # ⚡ 4. KOTLIN DRIVER
           cat << 'EOF' > app/src/main/java/com/zeeshan/camera/AiDriver.kt
           package com.zeeshan.camera
           import android.graphics.Bitmap
 
           class AiDriver {
               companion object {
-                  init { System.loadLibrary("zee_masterpiece") } 
+                  init { System.loadLibrary("zee_hybrid") } 
               }
-              external fun createMasterpiece(bitmaps: Array<Bitmap>, outputBitmap: Bitmap)
+              external fun processHybridStack(bitmaps: Array<Bitmap>, outputBitmap: Bitmap)
           }
           EOF
 
-          # 📱 5. MAIN ACTIVITY (The Brain Control)
+          # 📱 5. MAIN ACTIVITY (Taking 5 Burst Photos)
           cat << 'EOF' > app/src/main/java/com/zeeshan/camera/MainActivity.kt
           package com.zeeshan.camera
           
@@ -240,9 +229,7 @@ jobs:
               private var cameraControl: CameraControl? = null
               private val cameraExecutor = Executors.newSingleThreadExecutor()
               private val aiDriver = AiDriver()
-              
-              // RAM HACK: 5 frames chunk to prevent 4GB RAM from crashing while keeping quality
-              private val TOTAL_FRAMES = 5 
+              private val BURST_COUNT = 5
 
               override fun onCreate(savedInstanceState: Bundle?) {
                   super.onCreate(savedInstanceState)
@@ -261,24 +248,23 @@ jobs:
               @SuppressLint("ClickableViewAccessibility")
               private fun initCameraUI() {
                   val root = RelativeLayout(this).apply { setBackgroundColor(Color.BLACK) }
-                  
                   previewView = PreviewView(this)
                   root.addView(previewView, -1, -1)
 
-                  val brandText = TextView(this).apply { text = "ZEESHAN MASTERPIECE AI"; setTextColor(Color.WHITE); textSize = 22f; typeface = Typeface.DEFAULT_BOLD }
+                  val brandText = TextView(this).apply { text = "ZEESHAN HYBRID 5-STACK"; setTextColor(Color.WHITE); textSize = 22f; typeface = Typeface.DEFAULT_BOLD }
                   root.addView(brandText, RelativeLayout.LayoutParams(-2, -2).apply { addRule(RelativeLayout.CENTER_HORIZONTAL); topMargin = 50 })
 
                   val zoomSlider = SeekBar(this).apply { max = 90 }
                   root.addView(zoomSlider, RelativeLayout.LayoutParams(-1, 150).apply { topMargin = 150 })
 
-                  val captureBtn = Button(this).apply { text = "CREATE MASTERPIECE"; setBackgroundColor(Color.parseColor("#00E676")); setTextColor(Color.BLACK); textSize = 16f; typeface = Typeface.DEFAULT_BOLD }
+                  val captureBtn = Button(this).apply { text = "CREATE MASTERPIECE (5X)"; setBackgroundColor(Color.parseColor("#00E676")); setTextColor(Color.BLACK); textSize = 16f; typeface = Typeface.DEFAULT_BOLD }
                   root.addView(captureBtn, RelativeLayout.LayoutParams(600, 200).apply { addRule(RelativeLayout.ALIGN_PARENT_BOTTOM); addRule(RelativeLayout.CENTER_HORIZONTAL); bottomMargin = 100 })
 
                   statusText = TextView(this).apply { setTextColor(Color.YELLOW); gravity = Gravity.CENTER; textSize = 16f }
                   root.addView(statusText, RelativeLayout.LayoutParams(-1, 100).apply { addRule(RelativeLayout.ABOVE, captureBtn.id); bottomMargin = 320 })
 
                   processingOverlay = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setBackgroundColor(Color.parseColor("#E6000000")); visibility = View.GONE }
-                  processingOverlay.addView(TextView(this).apply { text = "COMPUTATIONAL ENGINE ACTIVE\nLayering Pixel Data..."; setTextColor(Color.CYAN); textSize = 20f; gravity = Gravity.CENTER })
+                  processingOverlay.addView(TextView(this).apply { text = "ZEESHAN HYBRID ENGINE\nStacking & Repairing Pixels..."; setTextColor(Color.CYAN); textSize = 20f; gravity = Gravity.CENTER })
                   root.addView(processingOverlay, -1, -1)
 
                   setContentView(root)
@@ -286,24 +272,15 @@ jobs:
 
                   zoomSlider.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                       override fun onProgressChanged(s: SeekBar?, p: Int, f: Boolean) {
-                          val zl = 1.0f + (p / 10.0f); cameraControl?.setZoomRatio(zl); statusText.text = "Optical Zoom: " + zl + "x"
+                          val zl = 1.0f + (p / 10.0f); cameraControl?.setZoomRatio(zl); statusText.text = "Zoom: " + zl + "x"
                       }
                       override fun onStartTrackingTouch(s: SeekBar?) {}
                       override fun onStopTrackingTouch(s: SeekBar?) {}
                   })
 
-                  previewView.setOnTouchListener { _, e ->
-                      if (e.action == MotionEvent.ACTION_DOWN) {
-                          cameraControl?.startFocusAndMetering(FocusMeteringAction.Builder(previewView.meteringPointFactory.createPoint(e.x, e.y), FocusMeteringAction.FLAG_AF).build())
-                          statusText.text = "Focus Locked 🎯"
-                          return@setOnTouchListener true
-                      }
-                      return@setOnTouchListener false
-                  }
-
                   captureBtn.setOnClickListener { 
                       processingOverlay.visibility = View.VISIBLE
-                      captureCakeData()
+                      captureHybridBurst()
                   }
               }
 
@@ -315,14 +292,13 @@ jobs:
                       provider.unbindAll()
                       val cam = provider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, Preview.Builder().build().also { it.setSurfaceProvider(previewView.surfaceProvider) }, imageCapture)
                       cameraControl = cam.cameraControl
-                      cameraControl?.setZoomRatio(1.0f)
-                      statusText.text = "Masterpiece System Ready"
+                      statusText.text = "Hybrid Stacking Ready"
                   }, ContextCompat.getMainExecutor(this))
               }
 
-              private fun captureCakeData() {
+              private fun captureHybridBurst() {
                   val frames = mutableListOf<Bitmap>()
-                  for (i in 1..TOTAL_FRAMES) {
+                  for (i in 1..BURST_COUNT) {
                       imageCapture?.takePicture(cameraExecutor, object : ImageCapture.OnImageCapturedCallback() {
                           override fun onCaptureSuccess(image: ImageProxy) {
                               try {
@@ -332,59 +308,46 @@ jobs:
                                   val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, null)
                                   frames.add(bitmap)
                                   
-                                  if (frames.size == TOTAL_FRAMES) {
-                                      runOnUiThread { statusText.text = "Fusing Data Layers..." }
-                                      fuseDataLayers(frames)
-                                  } else {
-                                      runOnUiThread { statusText.text = "Collecting Data: \${frames.size}/$TOTAL_FRAMES" }
+                                  if (frames.size == BURST_COUNT) {
+                                      runOnUiThread { statusText.text = "Fusing 5 Frames..." }
+                                      val out = frames[0].copy(Bitmap.Config.ARGB_8888, true)
+                                      aiDriver.processHybridStack(frames.toTypedArray(), out)
+                                      savePhoto(out)
                                   }
                               } finally { image.close() }
                           }
                           override fun onError(e: ImageCaptureException) { runOnUiThread { processingOverlay.visibility = View.GONE } }
                       })
-                      Thread.sleep(100) // Delay to let sensor reset
+                      Thread.sleep(150)
                   }
-              }
-
-              private fun fuseDataLayers(frames: List<Bitmap>) {
-                  val masterpieceBitmap = frames[0].copy(Bitmap.Config.ARGB_8888, true)
-                  
-                  // 🔥 FORCING C++ TO CREATE THE MASTERPIECE 🔥
-                  aiDriver.createMasterpiece(frames.toTypedArray(), masterpieceBitmap)
-                  
-                  savePhoto(masterpieceBitmap)
               }
 
               private fun savePhoto(bitmap: Bitmap) {
                   val ts = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
                   val cv = ContentValues().apply {
-                      put(MediaStore.MediaColumns.DISPLAY_NAME, "ZEESHAN_MASTERPIECE_" + ts + ".jpg")
+                      put(MediaStore.MediaColumns.DISPLAY_NAME, "ZEESHAN_HYBRID_" + ts + ".jpg")
                       put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
                       put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/ZeeshanCamera")
                   }
-                  
                   val uri = contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cv)
                   uri?.let { contentResolver.openOutputStream(it)?.use { out -> bitmap.compress(Bitmap.CompressFormat.JPEG, 100, out) } }
-                  
                   runOnUiThread { 
                       processingOverlay.visibility = View.GONE
-                      Toast.makeText(baseContext, "Masterpiece Created Successfully!", Toast.LENGTH_LONG).show() 
+                      Toast.makeText(baseContext, "5-Frame Masterpiece Saved!", Toast.LENGTH_LONG).show() 
                   }
               }
-              
-              override fun onDestroy() { super.onDestroy(); cameraExecutor.shutdown() }
           }
           EOF
 
-      - name: Build Zeeshan Masterpiece App
+      - name: Build Hybrid App
         uses: gradle/gradle-build-action@v3
         with:
           arguments: assembleDebug
           gradle-version: 8.1
 
-      - name: Upload Masterpiece APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Zeeshan-Camera-Masterpiece
+          name: Zeeshan-Camera-Hybrid-5X
           path: app/build/outputs/apk/debug/*.apk
 
