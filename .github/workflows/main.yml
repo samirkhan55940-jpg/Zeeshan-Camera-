@@ -1,4 +1,4 @@
-name: Zeeshan-Camera-5-Frame-Masterpiece
+name: Zeeshan-Camera-Dehaze-Masterpiece
 
 on:
   push:
@@ -24,7 +24,7 @@ jobs:
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/cpp
           
-          echo "BUILDING ZEESHAN CAMERA (5-FRAME PURE STACKING)..."
+          echo "BUILDING ZEESHAN CAMERA (DEHAZE & 5-FRAME STACKING)..."
 
           cat << 'EOF' > gradle.properties
           android.useAndroidX=true
@@ -55,7 +55,7 @@ jobs:
           target_link_libraries(zee_masterpiece ${log-lib} ${jnigraphics-lib})
           EOF
 
-          # 🔥 2. PURE C++ MASTERPIECE ENGINE (Merging 5 Photos safely on 4GB RAM)
+          # 🔥 2. PURE C++ MASTERPIECE ENGINE (Dehaze & Stacking)
           cat << 'EOF' > app/src/main/cpp/native-lib.cpp
           #include <jni.h>
           #include <android/bitmap.h>
@@ -76,7 +76,6 @@ jobs:
               std::vector<void*> pixel_ptrs(num_frames);
               std::vector<AndroidBitmapInfo> info_ptrs(num_frames);
 
-              // RAM LOCK: Accessing all 5 frames data
               for (int i = 0; i < num_frames; i++) {
                   jobject bmp = env->GetObjectArrayElement(bitmaps, i);
                   AndroidBitmap_getInfo(env, bmp, &info_ptrs[i]);
@@ -89,15 +88,15 @@ jobs:
               int width = output_info.width;
               int height = output_info.height;
 
-              LOGI("Zeeshan Engine: Fusing %d Real Frames into 1 Masterpiece!", num_frames);
+              LOGI("Zeeshan Engine: Fusing Frames and Removing Dust/Haze!");
 
-              // Data Merging Loop (No AI, Only Real Pixels)
+              // Data Merging & NASA-Style Dehaze Loop
               for (int y = 0; y < height; y++) {
                   uint32_t* out_line = (uint32_t*)output_pixels;
                   for (int x = 0; x < width; x++) {
                       int r_sum = 0, g_sum = 0, b_sum = 0;
                       
-                      // Adding data from all 5 photos
+                      // 1. STACKING: Adding data from all 5 photos to remove electronic noise
                       for (int i = 0; i < num_frames; i++) {
                           uint32_t* in_line = (uint32_t*)pixel_ptrs[i];
                           uint32_t pixel = in_line[x];
@@ -106,16 +105,25 @@ jobs:
                           b_sum += pixel & 0xff;
                       }
 
-                      // Averaging to remove grain (Noise)
                       int r = r_sum / num_frames;
                       int g = g_sum / num_frames;
                       int b = b_sum / num_frames;
 
-                      // Hardware Contrast (Making threads look solid and real)
-                      float contrast = 1.15f; 
-                      r = std::min(255, std::max(0, (int)((r - 128) * contrast + 128)));
-                      g = std::min(255, std::max(0, (int)((g - 128) * contrast + 128)));
-                      b = std::min(255, std::max(0, (int)((b - 128) * contrast + 128)));
+                      // 2. NASA-STYLE DEHAZE (Atmospheric Scattering Correction)
+                      // Finding the lowest color value to estimate the "dust/haze" layer
+                      int dark_channel = std::min(r, std::min(g, b));
+                      
+                      // Removing the grey/white dust wash (Pseudo-Retinex Math)
+                      float dehaze_power = 0.3f; // Removes 30% of the atmospheric dust veil
+                      r = std::max(0, r - (int)(dark_channel * dehaze_power));
+                      g = std::max(0, g - (int)(dark_channel * dehaze_power));
+                      b = std::max(0, b - (int)(dark_channel * dehaze_power));
+
+                      // 3. HARDWARE CONTRAST RECOVERY (Making threads look solid after dust removal)
+                      float contrast = 1.25f; 
+                      r = std::min(255, std::max(0, (int)((r - 128) * contrast + 128 + 15)));
+                      g = std::min(255, std::max(0, (int)((g - 128) * contrast + 128 + 15)));
+                      b = std::min(255, std::max(0, (int)((b - 128) * contrast + 128 + 15)));
 
                       int a = ((uint32_t*)pixel_ptrs[0])[x] >> 24;
                       out_line[x] = (a << 24) | (r << 16) | (g << 8) | b;
@@ -132,7 +140,6 @@ jobs:
                   jobject bmp = env->GetObjectArrayElement(bitmaps, i);
                   AndroidBitmap_unlockPixels(env, bmp);
               }
-              LOGI("Zeeshan Masterpiece Created Successfully!");
           }
           EOF
 
@@ -149,8 +156,8 @@ jobs:
                   applicationId 'com.zeeshan.camera'
                   minSdk 24
                   targetSdk 34
-                  versionCode 16
-                  versionName '16.0-Masterpiece'
+                  versionCode 18
+                  versionName '18.0-Dehaze-Masterpiece'
                   externalNativeBuild { cmake { cppFlags "-O3 -ffast-math" } } 
               }
               externalNativeBuild { cmake { path "src/main/cpp/CMakeLists.txt"; version "3.22.1" } }
@@ -166,7 +173,7 @@ jobs:
           }
           EOF
 
-          # 🏷️ APP NAME SET TO "Zeeshan Camera"
+          # 🏷️ APP NAME
           cat << 'EOF' > app/src/main/res/values/strings.xml
           <resources><string name="app_name">Zeeshan Camera</string></resources>
           EOF
@@ -198,7 +205,7 @@ jobs:
           }
           EOF
 
-          # 📱 5. MAIN ACTIVITY (5-Frame Capture & Screen Lock)
+          # 📱 5. MAIN ACTIVITY (Screen Lock & Dehaze UI)
           cat << 'EOF' > app/src/main/java/com/zeeshan/camera/MainActivity.kt
           package com.zeeshan.camera
           
@@ -235,7 +242,7 @@ jobs:
               private var cameraControl: CameraControl? = null
               private val cameraExecutor = Executors.newSingleThreadExecutor()
               
-              private val TOTAL_FRAMES = 5 // Taking exactly 5 photos
+              private val TOTAL_FRAMES = 5 
               private val nativeEngine = NativeEngine()
 
               override fun onCreate(savedInstanceState: Bundle?) {
@@ -273,14 +280,14 @@ jobs:
                   val zoomSlider = SeekBar(this).apply { max = 90 }
                   root.addView(zoomSlider, RelativeLayout.LayoutParams(-1, 150).apply { topMargin = 150 })
                   
-                  val captureBtn = Button(this).apply { text = "CAPTURE MASTERPIECE"; setBackgroundColor(Color.parseColor("#FFFFFF")); setTextColor(Color.BLACK); textSize = 16f; typeface = Typeface.DEFAULT_BOLD }
+                  val captureBtn = Button(this).apply { text = "CAPTURE (DEHAZE)"; setBackgroundColor(Color.parseColor("#FFFFFF")); setTextColor(Color.BLACK); textSize = 16f; typeface = Typeface.DEFAULT_BOLD }
                   root.addView(captureBtn, RelativeLayout.LayoutParams(600, 200).apply { addRule(RelativeLayout.ALIGN_PARENT_BOTTOM); addRule(RelativeLayout.CENTER_HORIZONTAL); bottomMargin = 100 })
                   
                   statusText = TextView(this).apply { setTextColor(Color.YELLOW); gravity = Gravity.CENTER; textSize = 16f }
                   root.addView(statusText, RelativeLayout.LayoutParams(-1, 100).apply { addRule(RelativeLayout.ABOVE, captureBtn.id); bottomMargin = 320 })
                   
                   processingOverlay = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setBackgroundColor(Color.parseColor("#D9000000")); visibility = View.GONE }
-                  processingOverlay.addView(TextView(this).apply { text = "SCREEN LOCKED 🔒\nFusing 5 Frames Data..."; setTextColor(Color.CYAN); textSize = 20f; gravity = Gravity.CENTER })
+                  processingOverlay.addView(TextView(this).apply { text = "DEHAZE ENGINE ACTIVE 🚀\nClearing Air Dust & Merging Data..."; setTextColor(Color.CYAN); textSize = 20f; gravity = Gravity.CENTER })
                   root.addView(processingOverlay, -1, -1)
                   
                   setContentView(root)
@@ -323,7 +330,7 @@ jobs:
                       val cam = provider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, Preview.Builder().build().also { it.setSurfaceProvider(previewView.surfaceProvider) }, imageCapture)
                       cameraControl = cam.cameraControl
                       cameraControl?.setZoomRatio(1.0f)
-                      statusText.text = "5-Frame System Ready"
+                      statusText.text = "Dehaze System Ready"
                   }, ContextCompat.getMainExecutor(this))
               }
 
@@ -340,7 +347,7 @@ jobs:
                                   frames.add(originalBitmap)
                                   
                                   if (frames.size == TOTAL_FRAMES) {
-                                      runOnUiThread { statusText.text = "Merging Data..." }
+                                      runOnUiThread { statusText.text = "Removing Dust..." }
                                       processMasterpiece(frames)
                                   }
                               } finally { image.close() }
@@ -358,7 +365,6 @@ jobs:
 
               private fun processMasterpiece(bitmaps: List<Bitmap>) {
                   val outputBitmap = bitmaps[0].copy(Bitmap.Config.ARGB_8888, true)
-                  // Sending all 5 frames to C++ to become 1 Masterpiece
                   nativeEngine.fuseMasterpiece(bitmaps.toTypedArray(), outputBitmap)
                   savePhoto(outputBitmap)
               }
@@ -366,7 +372,7 @@ jobs:
               private fun savePhoto(bitmap: Bitmap) {
                   val ts = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
                   val cv = ContentValues().apply {
-                      put(MediaStore.MediaColumns.DISPLAY_NAME, "ZEESHAN_MASTERPIECE_" + ts + ".jpg")
+                      put(MediaStore.MediaColumns.DISPLAY_NAME, "ZEESHAN_DEHAZE_" + ts + ".jpg")
                       put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
                       put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/ZeeshanCamera")
                   }
@@ -376,7 +382,7 @@ jobs:
                   runOnUiThread { 
                       processingOverlay.visibility = View.GONE
                       frozenPreviewView.visibility = View.GONE 
-                      Toast.makeText(baseContext, "Masterpiece Saved in Gallery!", Toast.LENGTH_LONG).show() 
+                      Toast.makeText(baseContext, "Dhul Removed! Masterpiece Saved.", Toast.LENGTH_LONG).show() 
                   }
               }
               
@@ -393,6 +399,6 @@ jobs:
       - name: Upload Zeeshan Camera APK
         uses: actions/upload-artifact@v4
         with:
-          name: Zeeshan-Camera-Final
+          name: Zeeshan-Camera-Dehaze
           path: app/build/outputs/apk/debug/*.apk
 
