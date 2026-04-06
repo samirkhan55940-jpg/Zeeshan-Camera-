@@ -1,4 +1,4 @@
-name: Zeeshan-Camera-Local-AI-Engine
+name: Zeeshan-Camera-Natural-Surgical
 
 on:
   push:
@@ -18,13 +18,13 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Build Zeeshan AI Camera Project
+      - name: Build Zeeshan Natural Camera
         run: |
           mkdir -p app/src/main/java/com/zeeshan/camera
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/cpp
           
-          echo "BUILDING ZEESHAN CAMERA (LOCAL AI PREDICTIVE SEARCH)..."
+          echo "BUILDING ZEESHAN CAMERA (SURGICAL FUSION + NATURAL COLORS)..."
 
           cat << 'EOF' > gradle.properties
           android.useAndroidX=true
@@ -49,13 +49,13 @@ jobs:
           cat << 'EOF' > app/src/main/cpp/CMakeLists.txt
           cmake_minimum_required(VERSION 3.22.1)
           project("zeeshancamera")
-          add_library(zee_local_ai SHARED native-lib.cpp)
+          add_library(zee_natural SHARED native-lib.cpp)
           find_library(log-lib log)
           find_library(jnigraphics-lib jnigraphics)
-          target_link_libraries(zee_local_ai ${log-lib} ${jnigraphics-lib})
+          target_link_libraries(zee_natural ${log-lib} ${jnigraphics-lib})
           EOF
 
-          # 🔥 2. C++ ENGINE: Local AI Predictive Search + Colorful Vivid Math
+          # 🔥 2. C++ ENGINE: Surgical Pixel Mining + 80% Reduced Natural Color
           cat << 'EOF' > app/src/main/cpp/native-lib.cpp
           #include <jni.h>
           #include <android/bitmap.h>
@@ -64,10 +64,9 @@ jobs:
           #include <cmath>
           #include <algorithm>
 
-          #define LOG_TAG "ZeeLocalAIEngine"
+          #define LOG_TAG "ZeeNaturalEngine"
           #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 
-          // TUKDE MATCHING (Sum of Absolute Differences)
           int getSAD(uint32_t* ref_pixels, uint32_t* target_pixels, int width, int bx, int by, int dx, int dy, int block_size) {
               int sad = 0;
               for (int y = 0; y < block_size; y++) {
@@ -101,25 +100,23 @@ jobs:
               int width = output_info.width;
               int height = output_info.height;
 
-              LOGI("Zeeshan Local AI Active: Running Predictive Smart Search...");
+              LOGI("Zeeshan Engine: Surgical Fusion & Natural Colors Running...");
 
               int block_size = 32; 
 
-              // ALIGN AND MERGE
               for (int by = 0; by < height - block_size; by += block_size) {
                   for (int bx = 0; bx < width - block_size; bx += block_size) {
                       
                       int best_dx[3] = {0, 0, 0};
                       int best_dy[3] = {0, 0, 0};
 
-                      // 🧠 LOCAL AI PREDICTIVE SEARCH (Three-Step Fast Math)
+                      // 🧠 LOCAL AI PREDICTIVE SEARCH (Fast Math)
                       for (int f = 1; f < num_frames; f++) {
-                          int step_size = 8; // Max Jump (Prediction size)
+                          int step_size = 8; 
                           int current_dx = 0;
                           int current_dy = 0;
                           int min_sad = 9999999;
 
-                          // AI predicting the movement direction in just 3 jumps (25 checks max)
                           while (step_size >= 1) {
                               int temp_best_dx = current_dx;
                               int temp_best_dy = current_dy;
@@ -144,39 +141,59 @@ jobs:
                               current_dx = temp_best_dx;
                               current_dy = temp_best_dy;
                               min_sad = current_min_sad;
-                              step_size /= 2; // Jump choti hoti jayegi (Fine tuning)
+                              step_size /= 2; 
                           }
                           best_dx[f] = current_dx;
                           best_dy[f] = current_dy;
                       }
 
-                      // JODNA AUR RANG BHARNA (Data Fusion + Vivid Colors)
+                      // 🛠️ SURGICAL FUSION ("Jitna zaroorat ho utna lagai")
                       for (int y = 0; y < block_size; y++) {
                           for (int x = 0; x < block_size; x++) {
-                              int r_sum = 0, g_sum = 0, b_sum = 0;
+                              // Photo 1 (Boss) ka asli pixel
+                              uint32_t base_p = pixel_ptrs[0][(by + y) * width + (bx + x)];
+                              int base_r = (base_p >> 16) & 0xff;
+                              int base_g = (base_p >> 8) & 0xff;
+                              int base_b = base_p & 0xff;
+
+                              int r_sum = base_r;
+                              int g_sum = base_g;
+                              int b_sum = base_b;
+                              int valid_count = 1;
                               
-                              for (int f = 0; f < num_frames; f++) {
+                              for (int f = 1; f < num_frames; f++) {
                                   int target_x = bx + x + best_dx[f];
                                   int target_y = by + y + best_dy[f];
                                   uint32_t p = pixel_ptrs[f][target_y * width + target_x];
-                                  r_sum += (p >> 16) & 0xff;
-                                  g_sum += (p >> 8) & 0xff;
-                                  b_sum += p & 0xff;
+                                  
+                                  int f_r = (p >> 16) & 0xff;
+                                  int f_g = (p >> 8) & 0xff;
+                                  int f_b = p & 0xff;
+
+                                  // SMART CHECK: Agar pixel Photo 1 se bohot zyada alag hai (matlab haath hila hai/bhoot hai), toh use MAT jodo.
+                                  // Sirf wahi pixel jodo jo noise hatane ke kaam aaye.
+                                  if (std::abs(f_r - base_r) < 40 && std::abs(f_g - base_g) < 40 && std::abs(f_b - base_b) < 40) {
+                                      r_sum += f_r;
+                                      g_sum += f_g;
+                                      b_sum += f_b;
+                                      valid_count++;
+                                  }
                               }
 
-                              int r = r_sum / num_frames;
-                              int g = g_sum / num_frames;
-                              int b = b_sum / num_frames;
+                              int r = r_sum / valid_count;
+                              int g = g_sum / valid_count;
+                              int b = b_sum / valid_count;
 
-                              // 🌈 VIVID SYSTEM (Color Taqat)
+                              // 🌿 NATURAL COLOR SYSTEM (80% Color Kam Kiya)
+                              // Pehle 1.40 tha, ab sirf 1.08 hai (Ekdum Asli Look)
                               float L = 0.299f * r + 0.587f * g + 0.114f * b;
-                              float saturation = 1.40f; // 40% Extra Rang
+                              float saturation = 1.08f; 
                               r = std::max(0, std::min(255, (int)(L + saturation * (r - L))));
                               g = std::max(0, std::min(255, (int)(L + saturation * (g - L))));
                               b = std::max(0, std::min(255, (int)(L + saturation * (b - L))));
 
-                              // 💪 HARDWARE CONTRAST (Thos Dhaage)
-                              float contrast = 1.15f;
+                              // Soft Contrast (Taaki photo natural lage)
+                              float contrast = 1.08f;
                               r = std::min(255, std::max(0, (int)((r - 128) * contrast + 128)));
                               g = std::min(255, std::max(0, (int)((g - 128) * contrast + 128)));
                               b = std::min(255, std::max(0, (int)((b - 128) * contrast + 128)));
@@ -192,7 +209,7 @@ jobs:
                   jobject bmp = env->GetObjectArrayElement(bitmaps, i);
                   AndroidBitmap_unlockPixels(env, bmp);
               }
-              LOGI("Zeeshan Local AI Masterpiece Saved Lightning Fast!");
+              LOGI("Zeeshan Natural Masterpiece Saved!");
           }
           EOF
 
@@ -209,8 +226,8 @@ jobs:
                   applicationId 'com.zeeshan.camera'
                   minSdk 24
                   targetSdk 34
-                  versionCode 21
-                  versionName '21.0-Local-AI-Master'
+                  versionCode 22
+                  versionName '22.0-Natural-Surgical'
                   externalNativeBuild { cmake { cppFlags "-O3 -ffast-math" } } 
               }
               externalNativeBuild { cmake { path "src/main/cpp/CMakeLists.txt"; version "3.22.1" } }
@@ -253,12 +270,12 @@ jobs:
           import android.graphics.Bitmap
 
           class NativeEngine {
-              companion object { init { System.loadLibrary("zee_local_ai") } }
+              companion object { init { System.loadLibrary("zee_natural") } }
               external fun fuseMasterpiece(bitmaps: Array<Bitmap>, outputBitmap: Bitmap)
           }
           EOF
 
-          # 📱 5. MAIN ACTIVITY (Fast Capture UI)
+          # 📱 5. MAIN ACTIVITY
           cat << 'EOF' > app/src/main/java/com/zeeshan/camera/MainActivity.kt
           package com.zeeshan.camera
           
@@ -295,7 +312,7 @@ jobs:
               private var cameraControl: CameraControl? = null
               private val cameraExecutor = Executors.newSingleThreadExecutor()
               
-              private val TOTAL_FRAMES = 3 // 3-Frame Fast AI Stacking
+              private val TOTAL_FRAMES = 3 
               private val nativeEngine = NativeEngine()
 
               override fun onCreate(savedInstanceState: Bundle?) {
@@ -333,14 +350,14 @@ jobs:
                   val zoomSlider = SeekBar(this).apply { max = 90 }
                   root.addView(zoomSlider, RelativeLayout.LayoutParams(-1, 150).apply { topMargin = 150 })
                   
-                  val captureBtn = Button(this).apply { text = "SMART AI CAPTURE"; setBackgroundColor(Color.parseColor("#00E676")); setTextColor(Color.BLACK); textSize = 16f; typeface = Typeface.DEFAULT_BOLD }
+                  val captureBtn = Button(this).apply { text = "CAPTURE NATURAL"; setBackgroundColor(Color.parseColor("#E0E0E0")); setTextColor(Color.BLACK); textSize = 16f; typeface = Typeface.DEFAULT_BOLD }
                   root.addView(captureBtn, RelativeLayout.LayoutParams(600, 200).apply { addRule(RelativeLayout.ALIGN_PARENT_BOTTOM); addRule(RelativeLayout.CENTER_HORIZONTAL); bottomMargin = 100 })
                   
                   statusText = TextView(this).apply { setTextColor(Color.YELLOW); gravity = Gravity.CENTER; textSize = 16f }
                   root.addView(statusText, RelativeLayout.LayoutParams(-1, 100).apply { addRule(RelativeLayout.ABOVE, captureBtn.id); bottomMargin = 320 })
                   
                   processingOverlay = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setBackgroundColor(Color.parseColor("#D9000000")); visibility = View.GONE }
-                  processingOverlay.addView(TextView(this).apply { text = "AI ENGINE ACTIVE 🧠\nFast Smart Matching..."; setTextColor(Color.CYAN); textSize = 20f; gravity = Gravity.CENTER })
+                  processingOverlay.addView(TextView(this).apply { text = "SURGICAL AI ACTIVE 🧬\nNatural Colors Rendering..."; setTextColor(Color.WHITE); textSize = 20f; gravity = Gravity.CENTER })
                   root.addView(processingOverlay, -1, -1)
                   
                   setContentView(root)
@@ -383,7 +400,7 @@ jobs:
                       val cam = provider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, Preview.Builder().build().also { it.setSurfaceProvider(previewView.surfaceProvider) }, imageCapture)
                       cameraControl = cam.cameraControl
                       cameraControl?.setZoomRatio(1.0f)
-                      statusText.text = "Smart AI Ready"
+                      statusText.text = "Natural Mode Ready"
                   }, ContextCompat.getMainExecutor(this))
               }
 
@@ -400,7 +417,7 @@ jobs:
                                   frames.add(originalBitmap)
                                   
                                   if (frames.size == TOTAL_FRAMES) {
-                                      runOnUiThread { statusText.text = "AI Analyzing Movement..." }
+                                      runOnUiThread { statusText.text = "Extracting Nano-Pixels..." }
                                       processMasterpiece(frames)
                                   }
                               } finally { image.close() }
@@ -425,7 +442,7 @@ jobs:
               private fun savePhoto(bitmap: Bitmap) {
                   val ts = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
                   val cv = ContentValues().apply {
-                      put(MediaStore.MediaColumns.DISPLAY_NAME, "ZEESHAN_AI_" + ts + ".jpg")
+                      put(MediaStore.MediaColumns.DISPLAY_NAME, "ZEESHAN_NATURAL_" + ts + ".jpg")
                       put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
                       put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/ZeeshanCamera")
                   }
@@ -435,7 +452,7 @@ jobs:
                   runOnUiThread { 
                       processingOverlay.visibility = View.GONE
                       frozenPreviewView.visibility = View.GONE 
-                      Toast.makeText(baseContext, "AI Masterpiece Saved! Lightning Fast!", Toast.LENGTH_LONG).show() 
+                      Toast.makeText(baseContext, "Natural Masterpiece Saved!", Toast.LENGTH_LONG).show() 
                   }
               }
               
@@ -452,6 +469,5 @@ jobs:
       - name: Upload Zeeshan Camera APK
         uses: actions/upload-artifact@v4
         with:
-          name: Zeeshan-Camera-Smart-AI
+          name: Zeeshan-Camera-Natural
           path: app/build/outputs/apk/debug/*.apk
-
